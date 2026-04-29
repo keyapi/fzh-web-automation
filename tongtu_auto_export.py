@@ -5,7 +5,7 @@
   uv run python tongtu_auto_export.py           # 持久化会话（首次手动登录，后续免登录）
   uv run python tongtu_auto_export.py --fresh    # 强制重新登录（清除已保存的会话）
 """
-import os, sys, time, shutil
+import subprocess, sys, time, shutil
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -76,9 +76,16 @@ def run_generate(inventory_path):
     """调用 generate_tongtu_import.py 生成导入文件"""
     generate_script = SCRIPT_DIR / "generate_tongtu_import.py"
     print("\n[信息] 生成导入文件...")
-    exit_code = os.system(f'"{sys.executable}" "{generate_script}" "{inventory_path}"')
-    if exit_code != 0:
-        print(f"[错误] 生成失败 (exit={exit_code})")
+    result = subprocess.run(
+        [sys.executable, str(generate_script), str(inventory_path)],
+        capture_output=True, text=True,
+    )
+    if result.stdout:
+        print(result.stdout.strip())
+    if result.stderr:
+        print(result.stderr.strip())
+    if result.returncode != 0:
+        print(f"[错误] 生成失败 (exit={result.returncode})")
         return False
     return True
 
