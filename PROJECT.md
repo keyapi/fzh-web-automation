@@ -13,11 +13,14 @@
 | `库存结存清单*.xlsx` | 通途导出（19列），第4行是表头，数据从第5行开始 |
 | `批量导入模板.xlsx` | 通途标准导入模板（5列），含Sheet2/Sheet3空表 |
 | `generate_tongtu_import.py` | 核心脚本：读取库存清单 → 生成导入文件 |
-| `tongtu_auto_export.py` | 浏览器自动化：用Playwright打开通途 → 点导出 → 调generate脚本 |
+| `tongtu_auto_export.py` | 浏览器自动化：打开通途 → 依次选6个仓库 → 导出 → 调generate脚本 |
 | `pyproject.toml` | uv项目配置，依赖：pandas、openpyxl、playwright |
-
+| `SKILL_deploy_playwright_mcp.md` | Skill 1：在新 Windows 电脑上部署 Playwright MCP（给无IT背景同事用） |
+| `SKILL_tongtu_automation.md` | Skill 2：通途库存自动化基本用法（给无IT背景同事用） |
 | `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
 | `chrome-profile/` | 持久化浏览器会话目录（自动创建，含cookies/localStorage，已在.gitignore排除） |
+| `downloads/` | 多仓库模式：下载的原始库存清单（按仓库重命名） |
+| `outputs/` | 多仓库模式：生成的导入文件（按仓库重命名） |
 
 ## 三、数据映射
 
@@ -53,9 +56,11 @@ uv run python tongtu_auto_export.py
 ```
 
 1. 浏览器自动弹出，自动加载持久化会话
-2. **首次使用：** 需要手动登录通途（输入用户名、密码、验证码），登录后 cookies 保存到 `chrome-profile/`
-3. **后续使用：** 自动检测到已登录 → 无需任何人工操作！
-4. 脚本自动完成：检测登录 → 选仓库 → 导出 → 下载 → 生成导入文件
+2. **首次使用：** 需要手动登录通途（输入用户名、密码、验证码，勾选 remember），登录后 cookies 保存到 `chrome-profile/`
+3. **后续使用：** 自动检测已登录 → 自动依次处理 **6 个仓库**：
+   - `CENTRADE` `FZHPoland-covers` `FZH-DANEEY-皮壳仓库` `FZH-DANEEY-退货产品仓` `FZH-DANEEY-成品仓` `FZH-DANEEY-半成品仓`
+4. 每个仓库：切换 → 导出 → 下载到 `downloads/` → 生成导入文件到 `outputs/`
+5. 文件名格式：`{仓库名}_库存结存清单2026-04-29...xlsx` 和 `{仓库名}_通途导入_头程运费_其他费用.xlsx`
 
 ### 重新登录（会话过期时）
 ```powershell
@@ -177,10 +182,17 @@ other_col = [c for c in df.columns if '头程其它费' in c or '其他费用' i
 3. ✅ **Git管理**：`.gitignore` 排除 `.xlsx`/`.png`，只追踪源码和配置
 4. ✅ **持久化登录**：`launch_persistent_context` + `chrome-profile/` 目录保存 cookies，首次手动登录，后续免登录
 5. ✅ **MCP 配置修复**：定位到正确路径 `Claude-3p/claude_desktop_config.json`（Microsoft Store版），添加 `mcpServers.playwright`，清理了之前写入错误路径的配置
+6. ✅ **多仓库依次导出**：脚本自动遍历 6 个仓库（CENTRADE / FZHPoland-covers / 皮壳仓库 / 退货产品仓 / 成品仓 / 半成品仓），每个仓库导出+生成分别保存到 `downloads/` 和 `outputs/`
+7. ✅ **Skill 文档**：创建 `SKILL_deploy_playwright_mcp.md` 和 `SKILL_tongtu_automation.md`，无 IT 背景的同事照着文档操作即可部署
+
+### MCP 部署关键注意事项
+- **Claude Desktop 必须彻底 Quit**：Windows 任务栏右下角系统托盘有常驻进程，只关窗口不够，必须 **右键托盘图标 → Quit**，再重新启动才能加载新 MCP
+- **Microsoft Store 版配置路径特殊**：`%LOCALAPPDATA%\Packages\Claude_xxx\LocalCache\Roaming\Claude-3p\claude_desktop_config.json`
+- 详见 `SKILL_deploy_playwright_mcp.md`
 
 ### 待改善项
-1. **Playwright MCP 验证**：MCP 配置已写入正确路径，需重启 Claude Desktop 确认服务器加载成功
-2. **会话过期自动处理**：当前会话过期时回退到轮询手动登录，可考虑加入 cookie 有效期检测
+1. **会话过期自动处理**：当前会话过期时回退到轮询手动登录，可考虑加入 cookie 有效期检测
+2. **Playwright MCP 实测**：MCP 已加载成功，需开新对话用 `browser_navigate`、`browser_snapshot`、`browser_click` 等工具实测操控通途
 
 ### 诊断工具
 - `inspect_warehouse.py`：打开页面 → 用户登录 → 自动dump含指定文字的DOM元素 → 输出JSON

@@ -33,3 +33,7 @@ uv.lock
 
 # Playwright persistent browser profile (cookies, localStorage)
 chrome-profile/
+
+# Multi-warehouse output directories
+downloads/
+outputs/
