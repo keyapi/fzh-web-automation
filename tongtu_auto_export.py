@@ -82,30 +82,49 @@ def ensure_toggle(page, div_id, label_text, target_class="toggle_btn_down"):
         return False
 
 
-def select_warehouse(page, name):
-    """点击指定仓库名称的切换按钮（基于 DOM 逆向: ExtJS togglebutton 组件）"""
-    # 用 #warehouseDisableDiv 限定范围，避免匹配到表格数据
-    target = page.locator("#warehouseDisableDiv a.toggle_btn, #warehouseDisableDiv a.toggle_btn_down", has_text=name).first
+def select_warehouse(page, name, all_warehouses=None):
+    """点击指定仓库名称的切换按钮（ExtJS togglebutton 组件）
+
+    通途 Bug 处理: 页面加载时 togglebutton 显示已选中，但 ExtJS 数据表格未实际渲染。
+    必须"先切到其他仓库再切回来"才能触发数据加载。"""
+    target = page.locator(
+        "#warehouseDisableDiv a.toggle_btn, #warehouseDisableDiv a.toggle_btn_down",
+        has_text=name,
+    ).first
     try:
         target.wait_for(state="visible", timeout=5000)
         current_class = target.get_attribute("class") or ""
         if "toggle_btn_down" in current_class:
-            print(f"  [OK] 仓库 '{name}' 已选中")
-            return True
-        print(f"  [操作] 切换至: {name}")
+            # 通途 Bug: 显示选中但数据可能没加载 → 先切走再切回来
+            other = _pick_other_warehouse(name, all_warehouses or [])
+            print(f"  [操作] 通途 Bug 规避: 先切 {other} 再切回 {name}")
+            page.locator(
+                "#warehouseDisableDiv a.toggle_btn, #warehouseDisableDiv a.toggle_btn_down",
+                has_text=other,
+            ).first.click()
+            page.wait_for_timeout(3000)
+        else:
+            print(f"  [操作] 切换至: {name}")
         target.click()
-        page.wait_for_timeout(5000)  # MCP 实测: 切换仓库后需 5s 等待数据刷新
+        page.wait_for_timeout(8000)
         return True
     except Exception as e:
         print(f"  [错误] 选仓库失败 '{name}': {e}")
         return False
 
 
+def _pick_other_warehouse(current, all_warehouses):
+    """从仓库列表中挑一个不是 current 的仓库名"""
+    for w in all_warehouses:
+        if w != current:
+            return w
+    return "FZHPoland-covers"  # fallback
+
+
 def click_export(page, warehouse_name):
-    """点击导出按钮，下载文件并重命名"""
-    with page.expect_download(timeout=90000) as download_info:
-        export_btn = page.locator('a[onclick="exportExcelPage()"]')
-        export_btn.click()
+    """点击导出按钮并等待下载（MCP 实测 click 有效，需确保数据表格已渲染）"""
+    with page.expect_download(timeout=60000) as download_info:
+        page.locator('a[onclick="exportExcelPage()"]').first.click()
         print(f"  [OK] 已点击导出，等待下载...")
 
     download = download_info.value
@@ -130,12 +149,18 @@ def run_generate(inventory_path, warehouse_name):
     )
     if result.stdout:
         for line in result.stdout.strip().split("\n"):
-            if "共" in line or "SKU" in line or "校验" in line or "错误" in line:
-                print(f"    {line.strip()}")
+            if any(kw in line for kw in ("共", "SKU", "校验", "错误", "完成", "OK")):
+                try:
+                    print(f"    {line.strip()}")
+                except UnicodeEncodeError:
+                    print(f"    {line.strip().encode('ascii', errors='replace').decode()}")
     if result.returncode != 0:
         print(f"  [错误] 生成失败 (exit={result.returncode})")
         if result.stderr:
-            print(f"    {result.stderr[:500]}")
+            try:
+                print(f"    {result.stderr[:500]}")
+            except UnicodeEncodeError:
+                pass
         return False
     return True
 
@@ -219,7 +244,7 @@ def run():
         page = context.pages[0] if context.pages else context.new_page()
 
         print("[信息] 打开库存结存页面...")
-        page.goto(TONGTU_URL, wait_until="networkidle", timeout=30000)
+        page.goto(TONGTU_URL, wait_until="networkidle", timeout=60000)
         page.wait_for_timeout(2000)
 
         if is_already_logged_in(page):
@@ -244,7 +269,7 @@ def run():
             print(f"[{idx}/{total}] 处理仓库: {wh}")
             print(f"{'='*50}")
 
-            select_warehouse(page, wh)
+            select_warehouse(page, wh, WAREHOUSES)
             inv_path = click_export(page, wh)
             run_generate(inv_path, wh)
 
