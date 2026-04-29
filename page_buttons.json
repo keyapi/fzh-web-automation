@@ -1,0 +1,218 @@
+[
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "navbar-brand",
+    "text": "",
+    "onclick": "",
+    "rect": "260x50"
+  },
+  {
+    "tag": "SPAN",
+    "id": "",
+    "name": "",
+    "cls": "logo",
+    "text": "",
+    "onclick": "",
+    "rect": "230x20"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "返回首页",
+    "onclick": "",
+    "rect": "106x60"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "返回首页",
+    "onclick": "",
+    "rect": "106x50"
+  },
+  {
+    "tag": "LI",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "帮助中心",
+    "onclick": "",
+    "rect": "106x60"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "帮助中心",
+    "onclick": "",
+    "rect": "106x50"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "ad1",
+    "text": "",
+    "onclick": "saveAdvClickLog('1')",
+    "rect": "220x200"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "ad2",
+    "text": "",
+    "onclick": "saveAdvClickLog('2')",
+    "rect": "220x200"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "ad2",
+    "text": "",
+    "onclick": "saveAdvClickLog('3')",
+    "rect": "220x200"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "ad3",
+    "text": "",
+    "onclick": "saveAdvClickLog('4')",
+    "rect": "690x275"
+  },
+  {
+    "tag": "INPUT",
+    "id": "",
+    "name": "username",
+    "cls": "form-control",
+    "text": "",
+    "onclick": "",
+    "rect": "310x42"
+  },
+  {
+    "tag": "INPUT",
+    "id": "password",
+    "name": "password",
+    "cls": "form-control",
+    "text": "",
+    "onclick": "",
+    "rect": "310x42"
+  },
+  {
+    "tag": "I",
+    "id": "eyeOpen",
+    "name": "",
+    "cls": "iconfont icon-yanjingbi",
+    "text": "",
+    "onclick": "eyeOpen()",
+    "rect": "17.5x14"
+  },
+  {
+    "tag": "INPUT",
+    "id": "",
+    "name": "captcha",
+    "cls": "form-control",
+    "text": "",
+    "onclick": "",
+    "rect": "185x42"
+  },
+  {
+    "tag": "IMG",
+    "id": "captcha",
+    "name": "",
+    "cls": "pic-yzm",
+    "text": "",
+    "onclick": "changeCaptcha()",
+    "rect": "110x42"
+  },
+  {
+    "tag": "BUTTON",
+    "id": "",
+    "name": "",
+    "cls": "btn btn-primary btn-lg btn-block",
+    "text": "立即登录",
+    "onclick": "",
+    "rect": "310x42"
+  },
+  {
+    "tag": "INPUT",
+    "id": "",
+    "name": "remember",
+    "cls": "",
+    "text": "",
+    "onclick": "",
+    "rect": "15x15"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "找回密码",
+    "onclick": "",
+    "rect": "52x15"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "",
+    "text": "免费注册",
+    "onclick": "",
+    "rect": "52x15"
+  },
+  {
+    "tag": "SPAN",
+    "id": "",
+    "name": "",
+    "cls": "or-title",
+    "text": "第三方登录",
+    "onclick": "",
+    "rect": "80x12"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "link-wx",
+    "text": "",
+    "onclick": "wxLogin()",
+    "rect": "42x42"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "link-ali",
+    "text": "",
+    "onclick": "alibabaLogin()",
+    "rect": "42x42"
+  },
+  {
+    "tag": "A",
+    "id": "",
+    "name": "",
+    "cls": "link-ch",
+    "text": "",
+    "onclick": "changhongLogin()",
+    "rect": "42x42"
+  },
+  {
+    "tag": "SPAN",
+    "id": "",
+    "name": "",
+    "cls": "text-full",
+    "text": "在线客服",
+    "onclick": "",
+    "rect": "70x42"
+  }
+]
