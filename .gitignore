@@ -14,6 +14,9 @@ __pycache__/
 *.png
 *.jpg
 
+# Debug output (temporary DOM dumps)
+debug_*.json
+
 # OS files
 Thumbs.db
 Desktop.ini
@@ -24,3 +27,6 @@ Desktop.ini
 
 # uv
 uv.lock
+
+# Claude Code
+.claude/

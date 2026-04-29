@@ -16,6 +16,8 @@
 | `tongtu_auto_export.py` | 浏览器自动化：用Playwright打开通途 → 点导出 → 调generate脚本 |
 | `pyproject.toml` | uv项目配置，依赖：pandas、openpyxl、playwright |
 
+| `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
+
 ## 三、数据映射
 
 库存结存清单（源，19列）→ 导入模板（目标，5列）：
@@ -43,16 +45,15 @@ uv sync                                    # 创建虚拟环境+装依赖
 uv run playwright install chromium         # 装Chromium浏览器
 ```
 
-### 每次使用（两步）
+### 每次使用（两步 → 现在只需一步！）
 ```powershell
 cd C:\Users\zhang\通途库存Excel
-uv run tongtu_auto_export.py --launch
+uv run tongtu_auto_export.py
 ```
 
 1. 浏览器自动弹出，打开库存结存页面
-2. 在浏览器里登录通途、手动选择仓库 `FZH-DANEEY-皮壳仓库`
-3. 切回终端按回车
-4. 脚本自动：点击导出 → 下载Excel → 调用generate生成导入文件
+2. 在浏览器里登录通途
+3. **脚本自动：** 检测登录完成 → 切换仓库至 `FZH-DANEEY-皮壳仓库` → 点击导出 → 下载Excel → 调用generate生成导入文件
 
 ### 也可以只生成导入文件（已有库存清单时）
 ```powershell
@@ -79,18 +80,42 @@ uv run python generate_tongtu_import.py 库存结存清单.xlsx 输出文件名.
 - **原因：** Playwright自带的Chromium下载到临时目录，不是系统Downloads
 - **解决：** 改用 Playwright原生下载事件 `page.expect_download()`，拦截浏览器下载事件
 
-### 问题4：自动选仓库未实现
-- **尝试：** `page.locator("select").first.select_option(label=...)` 无效
-- **原因：** 通途的仓库选择器不是标准`<select>`元素，可能是自定义下拉框组件
-- **inspect_page函数：** 最初用`querySelectorAll('[onclick]')`只抓到86个元素，改成全量扫描又降到24个（过多过滤条件过滤掉了关键元素）
-- **待改进：** 需要正确地dump出仓库选择器的DOM结构，才能写出自动选择逻辑
-- **当前方案：** 用户手动选仓库。这是本项目唯一的半自动化环节。
+### 问题6：os.system子进程找不到uv
+- **现象：** `run_generate` 中 `os.system('uv run python ...')` 返回 exit=1，提示 'uv' 不是内部命令
+- **原因：** 脚本通过 `uv run` 启动时 uv 在 PATH 中，但 `os.system` 启动的子进程不继承这个临时 PATH
+- **解决：** 改用 `sys.executable` 直接调用 venv 中的 Python：`os.system(f'"{sys.executable}" "{script}" "{path}"')`
 
-### 问题5：Python文件同步
-- **现象：** 沙箱内改的Python文件，用户需要知道改动并手动更新本地文件
-- **本质：** Cowork模式的Linux沙箱和用户Windows主机是隔离的，无法直接执行命令或部署
+### 问题4：自动选仓库 —— ✅ 已解决 (2026-04-29, Claude Code模式)
+- **原因：** 通途的仓库选择器不是标准`<select>`元素，而是自定义 `xtype="togglebutton"` 组件
+- **DOM结构：** `div#warehouseDisableDiv > div#coll` 容器内，每个仓库是 `<span xtype="togglebutton">` 内含 `<a class="toggle_btn">仓库名</a>`
+- **选中态：** `toggle_btn_down`（未选中是 `toggle_btn`）
+- **解决：** 用 `page.locator("#warehouseDisableDiv a", has_text="FZH-DANEEY-皮壳仓库")` 定位并点击
+- **自动化登录检测：** 用 `page.locator("#warehouseDisableDiv").is_visible()` 轮询检测登录完成（出现仓库选择器即表示已登录）
+- **调试方法：** 先写 `inspect_warehouse.py` 诊断脚本 dump 所有含"仓库"/"皮壳"的元素 → 分析JSON找到DOM结构 → 改写主脚本
+
+### 问题5：Python文件同步 —— ✅ 不再适用 (Claude Code模式)
+- **本质改变：** Claude Code直接在本机执行，无沙箱隔离，文件实时生效
 
 ## 六、关键代码片段
+
+### 自动检测登录完成（Playwright轮询）
+```python
+def wait_for_login(page, timeout=300):
+    for i in range(0, timeout, 3):
+        time.sleep(3)
+        el = page.locator("#warehouseDisableDiv")
+        if el.count() > 0 and el.is_visible():
+            return True
+    return False
+```
+
+### 自动选仓库（自定义ToggleButton组件）
+```python
+target = page.locator("#warehouseDisableDiv a", has_text="FZH-DANEEY-皮壳仓库").first
+if "toggle_btn_down" not in (target.get_attribute("class") or ""):
+    target.click()
+    page.wait_for_timeout(3000)  # 等待页面刷新
+```
 
 ### 导出按钮点击（Playwright）
 ```python
@@ -115,31 +140,31 @@ freight_col = [c for c in df.columns if '头程运费' in c][0]
 other_col = [c for c in df.columns if '头程其它费' in c or '其他费用' in c][0]
 ```
 
-## 七、给Claude Code/Cursor的接手建议
+## 七、Claude Code 接手记录
 
-### 立即改善项
-1. **自动选仓库**：用`page.evaluate()`执行JS找到仓库选择器的真实DOM结构（自定义组件可能有`data-value`、`data-id`或Vue/React绑定数据）
-2. **CDP持久化登录**：解决Chrome调试端口问题，用户可以关掉Chrome后重新启动但保留登录session
-3. **一站式**：考虑把导出和生成合并成一个Click，用户双击一个bat就能完成
+### 已完成 (2026-04-29)
+1. ✅ **自动选仓库**：解析 DOM → 发现 `togglebutton` 组件 → 用 `#warehouseDisableDiv a` 定位 → 代码已更新
+2. ✅ **一站式流程**：登录后全自动——检测登录→选仓库→导出→生成导入文件
+3. ✅ **Git管理**：`.gitignore` 排除 `.xlsx`/`.png`，只追踪源码和配置
 
-### 排查仓库选择器的方法
-在浏览器Console里执行这段：
+### 待改善项
+1. **CDP持久化登录**：解决Chrome调试端口问题，免去每次登录。P0需求
+2. **Playwright MCP**：已配置 `%APPDATA%\Claude\claude_desktop_config.json` 但 MCP 服务器未被加载（待排查 Claude Desktop 的 MCP 加载机制）
+
+### 诊断工具
+- `inspect_warehouse.py`：打开页面 → 用户登录 → 自动dump含指定文字的DOM元素 → 输出JSON
+  ```bash
+  uv run python inspect_warehouse.py
+  ```
+
+### 排查仓库选择器的方法（已完成，留作参考）
 ```javascript
-// 找到所有包含"仓库"文字的元素及其DOM结构
 document.querySelectorAll('*').forEach(el => {
     if (el.innerText && el.innerText.includes('仓库') && el.offsetParent) {
         console.log(el.tagName, el.className, el.id, el.outerHTML.slice(0,200));
     }
 });
 ```
-
-### 如果使用Claude Code + Playwright MCP
-Claude Code可以直接安装 `@anthropic/mcp-server-playwright`（或社区版），这样：
-- Agent可以直接 `page.goto`, `page.locator`, `page.click` 
-- 可以直接 `page.evaluate()` 查看DOM
-- 可以读写页面元素、截图、执行JS
-- **不需要Chrome扩展**，纯Playwright MCP驱动
-- Agent可以自主调试，不需要用户一步步跑脚本反馈
 
 ### uv环境信息
 - Python: 3.10 (Anaconda)
