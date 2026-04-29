@@ -30,3 +30,6 @@ uv.lock
 
 # Claude Code
 .claude/
+
+# Playwright persistent browser profile (cookies, localStorage)
+chrome-profile/

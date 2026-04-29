@@ -13,27 +13,29 @@
 
   2. 进入这个目录，创建虚拟环境 + 装依赖（一行搞定）：
      uv sync
-     或手动：uv venv && uv pip install pandas openpyxl playwright
-            && playwright install chromium
 
-  3. 关掉所有 Chrome 窗口，重新用调试端口启动：
-     chrome.exe --remote-debugging-port=9222
+  3. 安装 Playwright 浏览器：
+     uv run playwright install chromium
 
-  4. 在打开的 Chrome 中登录通途
-
-  5. 运行（加了 uv run 会自动激活虚拟环境）：
-     uv run tongtu_auto_export.py
+  4. 运行（首次需手动登录通途，后续免登录）：
+     uv run python tongtu_auto_export.py
 
 ------ 日常使用 ------
 
   双击 一键运行.cmd
   或者：
-  1. chrome.exe --remote-debugging-port=9222
-  2. uv run tongtu_auto_export.py
+  uv run python tongtu_auto_export.py
 
------- 调试选择器 ------
+  首次运行：浏览器弹出 → 手动登录（输入用户名、密码、验证码）
+                    → 脚本自动选仓库、导出、生成导入文件
+                    → 登录会话保存到 chrome-profile/ 目录
 
-  如果导出按钮点不到，用 Playwright 的录制功能：
-  uv run playwright codegen https://你的通途地址
-  手动点一遍导出流程，codegen 会自动生成 Python 代码，
-  把里面定位到按钮的那行复制替换到 tongtu_auto_export.py 里。
+  后续运行：浏览器弹出 → 自动检测到已登录 → 全程零人工！
+
+  如需重新登录（会话过期等原因）：
+  uv run python tongtu_auto_export.py --fresh
+
+------ 调试 ------
+
+  导出按钮定位变化时，用诊断脚本 dump 页面元素：
+  uv run python inspect_warehouse.py

@@ -17,6 +17,7 @@
 | `pyproject.toml` | uv项目配置，依赖：pandas、openpyxl、playwright |
 
 | `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
+| `chrome-profile/` | 持久化浏览器会话目录（自动创建，含cookies/localStorage，已在.gitignore排除） |
 
 ## 三、数据映射
 
@@ -45,15 +46,22 @@ uv sync                                    # 创建虚拟环境+装依赖
 uv run playwright install chromium         # 装Chromium浏览器
 ```
 
-### 每次使用（两步 → 现在只需一步！）
+### 每次使用
 ```powershell
 cd C:\Users\zhang\通途库存Excel
-uv run tongtu_auto_export.py
+uv run python tongtu_auto_export.py
 ```
 
-1. 浏览器自动弹出，打开库存结存页面
-2. 在浏览器里登录通途
-3. **脚本自动：** 检测登录完成 → 切换仓库至 `FZH-DANEEY-皮壳仓库` → 点击导出 → 下载Excel → 调用generate生成导入文件
+1. 浏览器自动弹出，自动加载持久化会话
+2. **首次使用：** 需要手动登录通途（输入用户名、密码、验证码），登录后 cookies 保存到 `chrome-profile/`
+3. **后续使用：** 自动检测到已登录 → 无需任何人工操作！
+4. 脚本自动完成：检测登录 → 选仓库 → 导出 → 下载 → 生成导入文件
+
+### 重新登录（会话过期时）
+```powershell
+uv run python tongtu_auto_export.py --fresh
+```
+清除旧会话，强制重新登录。
 
 ### 也可以只生成导入文件（已有库存清单时）
 ```powershell
@@ -62,12 +70,11 @@ uv run python generate_tongtu_import.py 库存结存清单.xlsx 输出文件名.
 
 ## 五、浏览器自动化调试历程
 
-### 问题1：CDP模式连接Chrome失败
-- **尝试：** `chrome.exe --remote-debugging-port=9222`，用Playwright `connect_over_cdp` 连接
-- **现象：** Chrome启动了但 `curl.exe http://127.0.0.1:9222/json/version` 始终连不上
-- **尝试过的修复：** 改127.0.0.1、加`--remote-allow-origins=*`、杀残留进程
-- **结论：** Windows环境CDP连接不稳定，放弃CDP模式，改用`--launch`（Playwright自己启动Chromium）
-- **影响：** launch模式需要手动登录（每次会话独立，无cookie持久化）。如果能解决CDP，可以免登录。
+### 问题1：CDP / 持久化登录 —— ✅ 已解决 (2026-04-29)
+- **原始尝试：** `chrome.exe --remote-debugging-port=9222` → CDP端点不可达
+- **最终方案：** Playwright `launch_persistent_context(user_data_dir="chrome-profile/")` 
+- **原理：** Playwright 自己管理 Chromium 实例，cookies/localStorage 持久化到磁盘的 `chrome-profile/` 目录。首次手动登录后，后续运行自动加载已保存的会话，免登录
+- **`--fresh` flag：** 强制删除 `chrome-profile/` 重新登录（会话过期时使用）
 
 ### 问题2：13个"导出Excel"按钮冲突
 - **现象：** `page.locator("text=导出Excel")` 报 strict mode violation
@@ -97,6 +104,28 @@ uv run python generate_tongtu_import.py 库存结存清单.xlsx 输出文件名.
 - **本质改变：** Claude Code直接在本机执行，无沙箱隔离，文件实时生效
 
 ## 六、关键代码片段
+
+### 持久化浏览器上下文（免登录核心）
+```python
+context = p.chromium.launch_persistent_context(
+    user_data_dir=str(PROFILE_DIR),
+    headless=False,
+    accept_downloads=True,
+    viewport={"width": 1280, "height": 800},
+    args=["--disable-blink-features=AutomationControlled"],
+)
+page = context.pages[0] if context.pages else context.new_page()
+```
+
+### 快速检测已登录会话
+```python
+def is_already_logged_in(page):
+    try:
+        el = page.locator("#warehouseDisableDiv")
+        return el.count() > 0 and el.is_visible()
+    except:
+        return False
+```
 
 ### 自动检测登录完成（Playwright轮询）
 ```python
@@ -146,10 +175,12 @@ other_col = [c for c in df.columns if '头程其它费' in c or '其他费用' i
 1. ✅ **自动选仓库**：解析 DOM → 发现 `togglebutton` 组件 → 用 `#warehouseDisableDiv a` 定位 → 代码已更新
 2. ✅ **一站式流程**：登录后全自动——检测登录→选仓库→导出→生成导入文件
 3. ✅ **Git管理**：`.gitignore` 排除 `.xlsx`/`.png`，只追踪源码和配置
+4. ✅ **持久化登录**：`launch_persistent_context` + `chrome-profile/` 目录保存 cookies，首次手动登录，后续免登录
+5. ✅ **MCP 配置修复**：定位到正确路径 `Claude-3p/claude_desktop_config.json`（Microsoft Store版），添加 `mcpServers.playwright`，清理了之前写入错误路径的配置
 
 ### 待改善项
-1. **CDP持久化登录**：解决Chrome调试端口问题，免去每次登录。P0需求
-2. **Playwright MCP**：已配置 `%APPDATA%\Claude\claude_desktop_config.json` 但 MCP 服务器未被加载（待排查 Claude Desktop 的 MCP 加载机制）
+1. **Playwright MCP 验证**：MCP 配置已写入正确路径，需重启 Claude Desktop 确认服务器加载成功
+2. **会话过期自动处理**：当前会话过期时回退到轮询手动登录，可考虑加入 cookie 有效期检测
 
 ### 诊断工具
 - `inspect_warehouse.py`：打开页面 → 用户登录 → 自动dump含指定文字的DOM元素 → 输出JSON

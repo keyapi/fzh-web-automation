@@ -2,36 +2,39 @@
 """
 通途库存清单自动导出 + 导入文件生成
 用法:
-  uv run python tongtu_auto_export.py           # 自动启动Chromium
-  uv run python tongtu_auto_export.py --cdp      # 连接已有Chrome (免登录)
+  uv run python tongtu_auto_export.py           # 持久化会话（首次手动登录，后续免登录）
+  uv run python tongtu_auto_export.py --fresh    # 强制重新登录（清除已保存的会话）
 """
-import os, sys, time
+import os, sys, time, shutil
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 TONGTU_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?warehouse=1&isFirstInto=1"
 TARGET_WAREHOUSE = "FZH-DANEEY-皮壳仓库"
 SCRIPT_DIR = Path(__file__).parent
-
-# 登录最长等待时间
+PROFILE_DIR = SCRIPT_DIR / "chrome-profile"
 LOGIN_TIMEOUT_SECS = 300
 
 
+def is_already_logged_in(page):
+    """快速检测是否已有有效登录会话"""
+    try:
+        el = page.locator("#warehouseDisableDiv")
+        return el.count() > 0 and el.is_visible()
+    except:
+        return False
+
+
 def wait_for_login(page):
-    """轮询等待用户完成登录（检测仓库选择器是否出现）"""
+    """轮询等待用户完成登录"""
     print(f"\n[信息] 请在浏览器中登录通途...")
     print(f"[信息] 脚本将自动检测登录状态（最长等待 {LOGIN_TIMEOUT_SECS} 秒）")
     for i in range(0, LOGIN_TIMEOUT_SECS, 3):
         time.sleep(3)
-        try:
-            # 登录成功后仓库选择器会出现
-            el = page.locator("#warehouseDisableDiv")
-            if el.count() > 0 and el.is_visible():
-                print("[OK] 检测到登录成功！自动继续...")
-                page.wait_for_timeout(1000)
-                return True
-        except:
-            pass
+        if is_already_logged_in(page):
+            print("[OK] 检测到登录成功！自动继续...")
+            page.wait_for_timeout(1000)
+            return True
         if i % 15 == 0 and i > 0:
             print(f"  等待登录中... ({i}/{LOGIN_TIMEOUT_SECS}s)")
     return False
@@ -39,7 +42,6 @@ def wait_for_login(page):
 
 def select_warehouse(page, name):
     """点击指定仓库名称的切换按钮"""
-    # 仓库按钮在 div#coll 里，是 <a class="toggle_btn"> 或 <a class="toggle_btn_down">
     target = page.locator("#warehouseDisableDiv a", has_text=name).first
     try:
         target.wait_for(state="visible", timeout=5000)
@@ -49,7 +51,7 @@ def select_warehouse(page, name):
             return True
         print(f"[操作] 切换仓库至 '{name}'...")
         target.click()
-        page.wait_for_timeout(3000)  # 等待页面刷新数据
+        page.wait_for_timeout(3000)
         return True
     except Exception as e:
         print(f"[错误] 选仓库失败: {e}")
@@ -82,31 +84,43 @@ def run_generate(inventory_path):
 
 
 def run():
-    mode = "cdp" if "--cdp" in sys.argv else "launch"
+    fresh = "--fresh" in sys.argv
+
+    if fresh and PROFILE_DIR.exists():
+        print("[信息] --fresh: 清除旧的登录会话...")
+        shutil.rmtree(PROFILE_DIR)
+
+    first_run = not PROFILE_DIR.exists()
+    if first_run:
+        print("[信息] 首次运行，将创建持久化浏览器会话")
 
     with sync_playwright() as p:
-        if mode == "cdp":
-            browser = p.chromium.connect_over_cdp("http://127.0.0.1:9222")
-            ctx = browser.contexts[0]
-            page = ctx.pages[0] if ctx.pages else ctx.new_page()
-        else:
-            print("[信息] 启动 Playwright Chromium...")
-            browser = p.chromium.launch(headless=False)
-            ctx = browser.new_context(accept_downloads=True, viewport={"width": 1280, "height": 800})
-            page = ctx.new_page()
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=str(PROFILE_DIR),
+            headless=False,
+            accept_downloads=True,
+            viewport={"width": 1280, "height": 800},
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        page = context.pages[0] if context.pages else context.new_page()
 
         print("[信息] 打开库存结存页面...")
         page.goto(TONGTU_URL, wait_until="networkidle", timeout=30000)
         page.wait_for_timeout(2000)
 
-        if not wait_for_login(page):
-            print("[错误] 登录超时，请重试")
-            browser.close()
-            sys.exit(1)
+        if is_already_logged_in(page):
+            print("[OK] 检测到已登录会话，自动继续...")
+        else:
+            if not first_run:
+                print("[信息] 登录会话已过期，请重新登录")
+            if not wait_for_login(page):
+                print("[错误] 登录超时，请重试")
+                context.close()
+                sys.exit(1)
 
         select_warehouse(page, TARGET_WAREHOUSE)
         inventory_path = click_export(page)
-        browser.close()
+        context.close()
 
         run_generate(inventory_path)
         print("\n[完成] 全部流程结束！")
