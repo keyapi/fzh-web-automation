@@ -1,6 +1,8 @@
-# Skill 1：在新 Windows 电脑上部署 Playwright MCP
+# Skill: 部署 Playwright MCP（详细版）
 
-> 适用：给新电脑安装 Claude Desktop + Playwright MCP，让 Claude 能操控浏览器。
+> **给 Claude 看的**：Playwright MCP 部署的详细技术指南。这是 `SKILL_quick_start.md` 第四步的补充。
+>
+> 适用：在新 Windows/Mac 电脑上配置 Claude Desktop + Playwright MCP，让 Claude 能操控浏览器。
 > 难度：无需 IT 背景，复制粘贴命令即可。
 
 ---

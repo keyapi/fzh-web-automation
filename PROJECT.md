@@ -15,8 +15,11 @@
 | `generate_tongtu_import.py` | 核心脚本：读取库存清单 → 生成导入文件 |
 | `tongtu_auto_export.py` | 浏览器自动化：打开通途 → 依次选6个仓库 → 导出 → 调generate脚本 |
 | `pyproject.toml` | uv项目配置，依赖：pandas、openpyxl、playwright |
-| `SKILL_deploy_playwright_mcp.md` | Skill 1：在新 Windows 电脑上部署 Playwright MCP（给无IT背景同事用） |
-| `SKILL_tongtu_automation.md` | Skill 2：通途库存自动化基本用法（给无IT背景同事用） |
+| `SKILL_deploy_playwright_mcp.md` | Skill: Playwright MCP 部署详细版（给 Claude 看的踩坑指南） |
+| `SKILL_tongtu_automation.md` | Skill: 通途库存自动化专项（给 Claude 看的通途特化指南） |
+| `SKILL_quick_start.md` | Skill: 通用环境安装（Windows/Mac，零基础，一句话启动） |
+| `SKILL_web_automation.md` | Skill: 浏览器自动化通用模式（选择器、登录、下载、踩坑） |
+| `README_给同事.md` | 给同事看的人口文件：这是什么、怎么开始 |
 | `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
 | `chrome-profile/` | 持久化浏览器会话目录（自动创建，含cookies/localStorage，已在.gitignore排除） |
 | `mcp_to_output.py` | MCP模式桥接脚本：将 MCP 下载的文件整理到 downloads/ + output/ |

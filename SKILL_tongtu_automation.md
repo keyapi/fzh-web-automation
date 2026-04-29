@@ -1,7 +1,12 @@
-# Skill 2：通途库存导入自动化 — 基本用法
+# Skill: 通途库存导入自动化
 
 > 适用：每天从通途 ERP 导出库存结存，生成可直接导入的 Excel 文件。
-> 前提：已完成 Skill 1（Playwright MCP 已部署）。
+>
+> **前提**：
+> - Claude Desktop 的 Code 模式 + Playwright MCP（详见 `SKILL_quick_start.md`）
+> - 通用浏览器自动化技巧（详见 `SKILL_web_automation.md`）
+>
+> **给 Claude 看的**：这是通途专项的自动化指南。通用模式（登录、选择器、下载）请参考 `SKILL_web_automation.md`。
 
 ---
 
