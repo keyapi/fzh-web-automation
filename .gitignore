@@ -36,4 +36,9 @@ chrome-profile/
 
 # Multi-warehouse output directories
 downloads/
-outputs/
+output/
+outputs/   # legacy (renamed to output/)
+
+# MCP temporary files
+.playwright-mcp/
+mcp_cookies.json

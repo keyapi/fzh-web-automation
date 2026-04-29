@@ -19,8 +19,10 @@
 | `SKILL_tongtu_automation.md` | Skill 2：通途库存自动化基本用法（给无IT背景同事用） |
 | `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
 | `chrome-profile/` | 持久化浏览器会话目录（自动创建，含cookies/localStorage，已在.gitignore排除） |
+| `mcp_to_output.py` | MCP模式桥接脚本：将 MCP 下载的文件整理到 downloads/ + output/ |
+| `extract_cookies.py` | 临时工具：从 chrome-profile 提取 cookies 供 MCP 注入（已整合到 tongtu_auto_export.py --export-cookies） |
 | `downloads/` | 多仓库模式：下载的原始库存清单（按仓库重命名） |
-| `outputs/` | 多仓库模式：生成的导入文件（按仓库重命名） |
+| `output/` | 多仓库模式：生成的导入文件（按仓库重命名） |
 
 ## 三、数据映射
 
@@ -182,8 +184,11 @@ other_col = [c for c in df.columns if '头程其它费' in c or '其他费用' i
 3. ✅ **Git管理**：`.gitignore` 排除 `.xlsx`/`.png`，只追踪源码和配置
 4. ✅ **持久化登录**：`launch_persistent_context` + `chrome-profile/` 目录保存 cookies，首次手动登录，后续免登录
 5. ✅ **MCP 配置修复**：定位到正确路径 `Claude-3p/claude_desktop_config.json`（Microsoft Store版），添加 `mcpServers.playwright`，清理了之前写入错误路径的配置
-6. ✅ **多仓库依次导出**：脚本自动遍历 6 个仓库（CENTRADE / FZHPoland-covers / 皮壳仓库 / 退货产品仓 / 成品仓 / 半成品仓），每个仓库导出+生成分别保存到 `downloads/` 和 `outputs/`
+6. ✅ **多仓库依次导出**：脚本自动遍历 6 个仓库（CENTRADE / FZHPoland-covers / 皮壳仓库 / 退货产品仓 / 成品仓 / 半成品仓），每个仓库导出+生成分别保存到 `downloads/` 和 `output/`
 7. ✅ **Skill 文档**：创建 `SKILL_deploy_playwright_mcp.md` 和 `SKILL_tongtu_automation.md`，无 IT 背景的同事照着文档操作即可部署
+8. ✅ **Playwright MCP 实测**：用 Playwright MCP 完成 6 仓库导出，验证了 cookie 注入、仓库切换、导出下载全流程（详见"八、MCP 调试记录"）
+9. ✅ **Cookie 提取工具**：`--export-cookies` flag 可从 chrome-profile 提取非 session cookie 供 MCP 注入使用
+10. ✅ **MCP 桥接脚本**：`mcp_to_output.py` 将 MCP 下载的文件整理到 `downloads/` 和 `output/`
 
 ### MCP 部署关键注意事项
 - **Claude Desktop 必须彻底 Quit**：Windows 任务栏右下角系统托盘有常驻进程，只关窗口不够，必须 **右键托盘图标 → Quit**，再重新启动才能加载新 MCP
@@ -192,7 +197,52 @@ other_col = [c for c in df.columns if '头程其它费' in c or '其他费用' i
 
 ### 待改善项
 1. **会话过期自动处理**：当前会话过期时回退到轮询手动登录，可考虑加入 cookie 有效期检测
-2. **Playwright MCP 实测**：MCP 已加载成功，需开新对话用 `browser_navigate`、`browser_snapshot`、`browser_click` 等工具实测操控通途
+2. **MCP 模式一键化**：目前 MCP 模式仍需要手动在对话中执行，可探索将整个 MCP 交互流程封装为 Claude skill/command
+
+## 八、MCP 调试记录 (2026-04-29 16:30-17:00)
+
+### 背景
+上一个 session 创建了 worktree 并激活了 Playwright MCP，但因 MCP 在 session 开始之后才激活，无法使用 `browser_navigate`。本 session（`affectionate-snyder-71ad77` worktree）新开对话，Playwright MCP 已可用。
+
+### 流程
+1. 用 `browser_tabs` → `browser_navigate` 打开库存结存页面
+2. 页面重定向到 passport.tongtool.com → 需要登录
+
+### 踩坑 1：Cookie 注入绕过登录
+- **尝试**: 直接从 `chrome-profile/Default/Network/Cookies` SQLite 读 cookie
+- **问题**: Cookie 值被 Chromium DPAPI 加密，sqlite3 读取为空
+- **解决**: 用 Playwright Python 的 `launch_persistent_context` + `context.cookies()` 获取解密后的 cookie
+- **结果**: 提取到 21 个 cookie（username, password hash, ttcuid 等），但 session cookie (JSESSIONID, SERVERID) 在启动新的 headless 实例时丢失
+
+### 踩坑 2：Session cookie 无法持久化
+- **现象**: 注入 21 个 cookie 后，session cookie (JSESSIONID) 不在其中
+- **原理**: JSESSIONID 是 Java 标准的 HTTP session cookie（无 expires），浏览器关闭即清除
+- **解决**: 虽然 JSESSIONID 丢失，但 passport 的记住密码 cookie (username + password hash + ttcuid) 仍然可用。注入 cookie 后导航到 ERP 页面，passport 检测到记住密码 cookie，自动完成登录并签发新的 JSESSIONID
+- **验证**: 注入后导航到 `erp102.tongtool.com/.../goodsbalance/...`，页面正常显示"库存结存>仓储管理"，用户名 张克勇
+
+### 踩坑 3：MCP 下载位置
+- **现象**: MCP 下载的文件保存在主仓库 `.playwright-mcp/` 目录，而非项目 worktree 下
+- **解决**: 创建 `mcp_to_output.py` 桥接脚本，扫描 MCP 下载目录 → 按仓库重命名 → 复制到 `downloads/` → 调用 `generate_tongtu_import.py` 生成导入文件到 `output/`
+
+### 踩坑 4：text= 选择器的歧义风险
+- **现象**: `text=FZH-DANEEY-半成品仓` 可能匹配到表格数据中的同名字段
+- **解决**: Python 脚本中已使用 `#warehouseDisableDiv a.toggle_btn` 限定范围，比纯 `text=` 更安全
+
+### 踩坑 5：仓库切换等待时间
+- **Python 脚本**: 原用 3s
+- **MCP 实测**: 5s 更可靠（网络波动时 3s 可能不够）
+- **已更新**: `select_warehouse()` 等待时间改为 5s
+
+### MCP 模式下各仓库导出数据量
+| 仓库 | SKU 数 | 文件大小 |
+|------|--------|---------|
+| CENTRADE | 1,624 | 206 KB |
+| FZHPoland-covers | 1,359 | 221 KB |
+| FZH-DANEEY-皮壳仓库 | 895 | 165 KB |
+| FZH-DANEEY-退货产品仓 | 504 | 101 KB |
+| FZH-DANEEY-成品仓 | 241 | 48 KB |
+| FZH-DANEEY-半成品仓 | 146 | 31 KB |
+| **合计** | **4,769** | **772 KB** |
 
 ### 诊断工具
 - `inspect_warehouse.py`：打开页面 → 用户登录 → 自动dump含指定文字的DOM元素 → 输出JSON

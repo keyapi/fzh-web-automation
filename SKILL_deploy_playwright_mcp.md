@@ -96,3 +96,6 @@ Playwright MCP 需要 Node.js 运行。
 | `npx` 命令找不到 | Node.js 没装或没加到 PATH。重新安装 Node.js LTS 版，安装时勾选 "Add to PATH" |
 | Claude Desktop 启动报错 | JSON 格式有误。用 https://jsonlint.com 验证你的配置文件 |
 | 浏览器能打开但白屏 | 首次使用需要下载 Chromium，稍等 1-2 分钟再试 |
+| Claude Code 中 MCP 工具不可用 | 如果 MCP 在当前 session 开始后才激活，Claude Code 可能无法热加载。需要**新建对话**（新 session）才能使用 MCP 工具 |
+| 通途登录页无法自动登录 | 需先用项目脚本 `uv run python tongtu_auto_export.py --export-cookies` 导出 cookie，再在 MCP session 中用 `browser_run_code` + `addCookies()` 注入 |
+| 通途页面 cookie 注入后仍跳转登录页 | session cookie (JSESSIONID) 无法持久化，但记住密码 cookie 可触发自动登录。注入后等待 3-5 秒，再导航到 `erp102.tongtool.com/.../goodsbalance/...` |

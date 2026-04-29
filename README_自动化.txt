@@ -35,6 +35,15 @@
   如需重新登录（会话过期等原因）：
   uv run python tongtu_auto_export.py --fresh
 
+------ MCP 对话模式 ------
+
+  如果部署了 Playwright MCP（见 SKILL_deploy_playwright_mcp.md），
+  也可以在 Claude Desktop 对话中直接操控浏览器导出。
+
+  MCP 下载的文件保存在 .playwright-mcp/ 目录，
+  用桥接脚本整理并生成导入文件：
+  uv run python mcp_to_output.py --auto
+
 ------ 调试 ------
 
   导出按钮定位变化时，用诊断脚本 dump 页面元素：

@@ -1,11 +1,23 @@
 #!/usr/bin/env python3
 """
 通途库存清单自动导出 + 导入文件生成（多仓库版）
+
 用法:
   uv run python tongtu_auto_export.py           # 持久化会话，依次导出所有仓库
   uv run python tongtu_auto_export.py --fresh    # 强制重新登录
+  uv run python tongtu_auto_export.py --export-cookies  # 导出 cookies 供 MCP 使用
+
+输出目录:
+  downloads/   原始库存清单 XLSX（每个仓库一个）
+  output/      生成的导入文件 XLSX（每个仓库一个）
+
+MCP 模式经验:
+  - MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile
+  - 解决方案: 用 --export-cookies 提取 cookie → MCP browser_run_code 注入
+  - 但 session cookie (JSESSIONID) 无法持久化，需要 passport 的记住密码 cookie
+  - 参考 PROJECT.md "八、MCP 调试记录" 章节了解详情
 """
-import subprocess, sys, time, shutil
+import subprocess, sys, time, shutil, json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
@@ -13,7 +25,7 @@ TONGTU_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?wareh
 SCRIPT_DIR = Path(__file__).parent
 PROFILE_DIR = SCRIPT_DIR / "chrome-profile"
 DOWNLOADS_DIR = SCRIPT_DIR / "downloads"
-OUTPUTS_DIR = SCRIPT_DIR / "outputs"
+OUTPUT_DIR = SCRIPT_DIR / "output"
 LOGIN_TIMEOUT_SECS = 300
 
 # 依次导出的仓库列表
@@ -71,8 +83,9 @@ def ensure_toggle(page, div_id, label_text, target_class="toggle_btn_down"):
 
 
 def select_warehouse(page, name):
-    """点击指定仓库名称的切换按钮"""
-    target = page.locator("#warehouseDisableDiv a", has_text=name).first
+    """点击指定仓库名称的切换按钮（基于 DOM 逆向: ExtJS togglebutton 组件）"""
+    # 用 #warehouseDisableDiv 限定范围，避免匹配到表格数据
+    target = page.locator("#warehouseDisableDiv a.toggle_btn, #warehouseDisableDiv a.toggle_btn_down", has_text=name).first
     try:
         target.wait_for(state="visible", timeout=5000)
         current_class = target.get_attribute("class") or ""
@@ -81,7 +94,7 @@ def select_warehouse(page, name):
             return True
         print(f"  [操作] 切换至: {name}")
         target.click()
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(5000)  # MCP 实测: 切换仓库后需 5s 等待数据刷新
         return True
     except Exception as e:
         print(f"  [错误] 选仓库失败 '{name}': {e}")
@@ -109,24 +122,78 @@ def run_generate(inventory_path, warehouse_name):
     """调用 generate_tongtu_import.py 生成导入文件"""
     generate_script = SCRIPT_DIR / "generate_tongtu_import.py"
     prefix = safe_prefix(warehouse_name)
-    out_path = OUTPUTS_DIR / f"{prefix}_通途导入_头程运费_其他费用.xlsx"
+    out_path = OUTPUT_DIR / f"{prefix}_通途导入_头程运费_其他费用.xlsx"
     print(f"  [信息] 生成导入文件 → {out_path.name}")
     result = subprocess.run(
         [sys.executable, str(generate_script), str(inventory_path), str(out_path)],
-        capture_output=True, text=True,
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
     )
-    for line in result.stdout.strip().split("\n"):
-        if "共" in line or "SKU" in line or "校验" in line or "错误" in line:
-            print(f"    {line.strip()}")
+    if result.stdout:
+        for line in result.stdout.strip().split("\n"):
+            if "共" in line or "SKU" in line or "校验" in line or "错误" in line:
+                print(f"    {line.strip()}")
     if result.returncode != 0:
         print(f"  [错误] 生成失败 (exit={result.returncode})")
         if result.stderr:
-            print(f"    {result.stderr.strip()}")
+            print(f"    {result.stderr[:500]}")
         return False
     return True
 
 
+def export_cookies():
+    """从 chrome-profile 提取 cookies 供 MCP 注入使用
+
+    这是 MCP 调试后发现的关键功能:
+    - MCP Playwright 使用独立浏览器实例，无法直接复用 chrome-profile
+    - 但可以通过 context.cookies() 提取持久化的非 session cookie
+    - 输出 JSON 可直接用于 MCP 的 browser_run_code → addCookies()
+    - 注意: session cookie (JSESSIONID) 无法持久化，但 passport 的
+      记住密码 cookie (username/password hash) 可实现自动登录
+    """
+    if not PROFILE_DIR.exists():
+        print("[错误] chrome-profile/ 不存在，请先运行一次脚本登录")
+        sys.exit(1)
+
+    with sync_playwright() as p:
+        context = p.chromium.launch_persistent_context(
+            user_data_dir=str(PROFILE_DIR),
+            headless=True,
+        )
+        all_cookies = context.cookies()
+        context.close()
+
+    tongtu_cookies = [c for c in all_cookies if "tongtool" in c.get("domain", "")]
+    output = []
+    for c in tongtu_cookies:
+        entry = {
+            "name": c["name"],
+            "value": c["value"],
+            "domain": c["domain"],
+            "path": c["path"],
+            "secure": c.get("secure", False),
+            "httpOnly": c.get("httpOnly", False),
+        }
+        if "expires" in c and c["expires"] > 0:
+            entry["expires"] = c["expires"]
+        output.append(entry)
+
+    out_path = SCRIPT_DIR / "mcp_cookies.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, indent=2, ensure_ascii=False)
+
+    print(f"[OK] 已导出 {len(output)} 个 cookie → {out_path}")
+    print(f"[信息] 在 MCP 会话中使用 browser_run_code 注入这些 cookies:")
+    print(f"  await page.context().addCookies(cookies);")
+    print(f"[注意] session cookie (JSESSIONID 等) 无法通过此方式持久化，")
+    print(f"       但 passport 的记住密码 cookie 可触发自动登录。")
+
+
 def run():
+    # --export-cookies: 提取 cookies 供 MCP 注入使用
+    if "--export-cookies" in sys.argv:
+        export_cookies()
+        return
+
     fresh = "--fresh" in sys.argv
 
     if fresh and PROFILE_DIR.exists():
@@ -139,7 +206,7 @@ def run():
 
     # 确保输出目录存在
     DOWNLOADS_DIR.mkdir(exist_ok=True)
-    OUTPUTS_DIR.mkdir(exist_ok=True)
+    OUTPUT_DIR.mkdir(exist_ok=True)
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
@@ -186,7 +253,7 @@ def run():
     print(f"\n{'='*50}")
     print(f"[完成] 全部 {total} 个仓库已处理！")
     print(f"  下载文件: {DOWNLOADS_DIR}")
-    print(f"  导入文件: {OUTPUTS_DIR}")
+    print(f"  导入文件: {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":
