@@ -99,7 +99,9 @@ def merge_downloads(downloads_dir, warehouses, output_path):
 
 
 def main():
-    output_name = "合并库存结存清单.xlsx"
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M")
+    output_name = f"通途合并库存结存清单 {ts}.xlsx"
     for arg in sys.argv[1:]:
         if arg.startswith("--output="):
             output_name = arg.split("=", 1)[1]

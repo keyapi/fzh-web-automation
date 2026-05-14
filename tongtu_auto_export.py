@@ -324,7 +324,9 @@ def merge_all_inventory():
         return
 
     merged = pd.concat(all_dfs, ignore_index=True)
-    merged_path = OUTPUT_DIR / "合并库存结存清单.xlsx"
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M")
+    merged_path = OUTPUT_DIR / f"通途合并库存结存清单 {ts}.xlsx"
     merged.to_excel(merged_path, index=False, sheet_name="合并库存")
     print(f"  [OK] 合并完成: {len(merged)} 行 → {merged_path}")
 
