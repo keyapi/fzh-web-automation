@@ -280,6 +280,54 @@ def run():
     print(f"  下载文件: {DOWNLOADS_DIR}")
     print(f"  导入文件: {OUTPUT_DIR}")
 
+    # 合并多仓原始清单
+    merge_all_inventory()
+
+
+def merge_all_inventory():
+    """将 downloads/ 下所有仓库的原始清单合并为一个 Excel"""
+    try:
+        import pandas as pd
+    except ImportError:
+        print("[跳过] 合并步骤需 pandas（已在 pyproject.toml 中声明）")
+        return
+
+    all_dfs = []
+    for wh in WAREHOUSES:
+        prefix = safe_prefix(wh)
+        files = sorted(
+            DOWNLOADS_DIR.glob(f"{prefix}_库存结存清单*.xlsx"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        if not files:
+            print(f"  [跳过] {wh}: 未找到下载文件")
+            continue
+        path = files[0]
+        print(f"  [合并] {wh}  →  {path.name}")
+
+        df = pd.read_excel(path, header=None)
+        header_mask = df.iloc[:, 0].astype(str).str.strip() == "SKU"
+        if header_mask.sum() == 0:
+            print(f"    [警告] 未找到 SKU 表头，跳过")
+            continue
+        header_idx = header_mask[header_mask].index[0]
+        df.columns = df.iloc[header_idx].astype(str).str.replace("\n", "").str.strip()
+        df = df.iloc[header_idx + 1:]
+        sku_col = df.columns[0]
+        df = df[~df[sku_col].astype(str).str.strip().isin(["数量总计", "金额总计", "", "nan"])]
+        df = df[df[sku_col].notna()]
+        all_dfs.append(df)
+
+    if not all_dfs:
+        print("[警告] 没有可合并的数据")
+        return
+
+    merged = pd.concat(all_dfs, ignore_index=True)
+    merged_path = OUTPUT_DIR / "合并库存结存清单.xlsx"
+    merged.to_excel(merged_path, index=False, sheet_name="合并库存")
+    print(f"  [OK] 合并完成: {len(merged)} 行 → {merged_path}")
+
 
 if __name__ == "__main__":
     run()
