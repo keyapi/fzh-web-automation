@@ -78,7 +78,9 @@ metadata:
 4. 等待 5-8 秒（SPA JS 渲染）
 5. **读对应 `references/*.md`** 获取该页面的选择器
 6. 按 reference 中的选择器执行操作
-7. 每次 MCP 探索后有新发现，**立即更新 reference 文件**
+7. **操作前先关闭所有弹窗**：赛狐页面 el-popover/el-select-dropdown 容易残留，用 Escape 或点击页面标题关闭
+8. **选择器优先用位置定位**（left/top），placeholder 会动态变化不可靠
+9. 每次 MCP 探索后有新发现，**立即更新 reference 文件**
 
 ## 探索进度
 
