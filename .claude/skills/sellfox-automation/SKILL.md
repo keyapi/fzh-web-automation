@@ -70,6 +70,36 @@ metadata:
     └── sellfox_cookies.py            # Cookie 持久化 (待开发)
 ```
 
+## 登录流程（踩坑总结）
+
+### Python 持久化登录
+```python
+context = p.chromium.launch_persistent_context(
+    user_data_dir="sellfox-profile/",  # cookies 自动持久化到这里
+    headless=False,
+)
+```
+- 首次：手动登录 → cookies 自动保存 → **下次免登录**
+- 过期：`--fresh` 强制删除 profile 重新登录
+
+### 登录检测（双重判定）
+赛狐登录后跳转到 **dashboard**（不是库存页）。检测需两种方式：
+
+1. **URL 检测**：`"login" not in page.url`（登录后跳离 login.html）
+2. **用户元素检测**：`page.locator('text=克勇').first.is_visible()`（用户名出现）
+
+### 登录后跳转
+登录成功 → 立刻检测 `page.url`：
+- 如果在 dashboard → `page.goto(PAGE_URL)` 跳到仓库页
+- 如果已在仓库页 → 直接继续
+
+### 踩坑：MCP vs Python 登录差异
+| | MCP 浏览器 | Python Playwright |
+|---|---|---|
+| Cookie 持久化 | ❌ 会话关闭即丢失 | ✅ persistent_context 自动保存 |
+| 登录检测 | 人工确认 | 代码双重检测(URL+元素) |
+| httpOnly cookie | 无法获取 | context.cookies() 全量获取 |
+
 ## 标准操作流程
 
 1. 导航到目标 URL

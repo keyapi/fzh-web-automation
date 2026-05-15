@@ -7,6 +7,7 @@
   uv run python sellfox_auto_export.py --api       # API 模式（请求直接调 API）
   uv run python sellfox_auto_export.py --headless  # 浏览器无头模式（后台运行）
   uv run python sellfox_auto_export.py --fresh     # 强制重新登录
+  uv run python sellfox_auto_export.py --demo-search  # 演示搜索切换 (SKU/品名/精/模)
   uv run python sellfox_auto_export.py --export-cookies  # 导出 cookies 供 API 使用
 
 两种模式对比:
@@ -88,6 +89,128 @@ def ensure_page_ready(page):
     page.wait_for_timeout(500)
 
 
+# ─── 搜索切换（MCP 验证的选择器）─────────────────────────────
+
+def get_search_type(page):
+    """读取当前搜索类型 — 通过 value 属性而非位置"""
+    return page.evaluate("""
+      (() => { const inputs = document.querySelectorAll('input.el-input__inner');
+        for (const inp of inputs) {
+          const v = inp.value; if (!v) continue;
+          if (['SKU','识别码','品名','型号','FNSKU','SPU','款名','MSKU'].includes(v))
+            return v;
+        }
+        return '?'; })()
+    """)
+
+
+def get_search_mode(page):
+    """读取当前搜索模式: 'fuzzy' | 'exact'"""
+    return page.evaluate("() => document.querySelector('.icon_sf_fuzzy') ? 'fuzzy' : 'exact'")
+
+
+def switch_search_type(page, target):
+    """切换搜索类型: SKU / 品名 / 识别码 / 型号 / FNSKU / SPU / 款名 / MSKU"""
+    current = get_search_type(page)
+    if current == target:
+        print(f"      搜索类型已是 {target}")
+        return
+
+    print(f"      切换: {current} → {target}")
+    # 先关掉任何残留弹窗
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    # evaluate 点击 el-select（绕过 Playwright visible check）
+    page.evaluate("""
+      (() => { const inputs = document.querySelectorAll('input.el-input__inner');
+        for (const inp of inputs) {
+          if (inp.value === 'SKU' || inp.value === '识别码' || inp.value === '品名'
+           || inp.value === '型号' || inp.value === 'FNSKU' || inp.value === 'SPU'
+           || inp.value === '款名' || inp.value === 'MSKU') {
+            const sel = inp.closest('.el-select');
+            if (sel) { sel.click(); return; }
+          }
+        }
+      })()
+    """)
+    page.wait_for_timeout(500)
+    # click 可见的下拉选项
+    page.evaluate(f"""
+      (() => {{ const items = [...document.querySelectorAll('.el-select-dropdown__item')]
+        .filter(i => i.getBoundingClientRect().width > 0);
+        const m = items.find(i => i.textContent.trim() === '{target}');
+        if (m) m.click(); }})()
+    """)
+    page.wait_for_timeout(500)
+    print(f"      结果: {get_search_type(page)}")
+
+
+def toggle_search_mode(page, target):
+    """切换搜索模式: exact(精) / fuzzy(模)"""
+    current = get_search_mode(page)
+    if current == target:
+        print(f"      搜索模式已是 {target}")
+        return
+    print(f"      切换: {current} → {target}")
+    page.locator(".search_type_btn").first.click()
+    page.wait_for_timeout(300)
+    print(f"      结果: {get_search_mode(page)}")
+
+
+def search_keyword(page, keyword):
+    """在搜索框输入关键词并回车"""
+    inp = page.locator("input[placeholder='双击可批量搜索内容'], input[placeholder='搜索内容']").first
+    inp.click()
+    inp.fill("")
+    inp.fill(keyword)
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(3000)
+
+
+def get_result_count(page):
+    """读取搜索结果总数"""
+    text = page.evaluate("() => { const p = document.querySelector('.el-pagination'); return p ? p.textContent.trim() : '0条'; }")
+    # "共 XXXX 条..." 提取数字
+    import re
+    m = re.search(r'共\s*(\d+)\s*条', text)
+    return int(m.group(1)) if m else 0
+
+
+def demo_search_switching(page):
+    """演示搜索切换: SKU模糊 → SKU精确 → 品名模糊"""
+    print("\n" + "=" * 50)
+    print("搜索切换演示（MCP 验证的选择器）")
+    print("=" * 50)
+
+    keyword = "KS0001"
+
+    # Test 1: SKU + 模糊
+    print(f"\n[测试1] SKU + 模糊搜索: {keyword}")
+    switch_search_type(page, "SKU")
+    toggle_search_mode(page, "fuzzy")
+    search_keyword(page, keyword)
+    count = get_result_count(page)
+    print(f"  → 结果: {count} 条（模糊匹配 KS0001-xxx-xxx）")
+
+    # Test 2: SKU + 精确
+    print(f"\n[测试2] SKU + 精确搜索: {keyword}")
+    toggle_search_mode(page, "exact")
+    search_keyword(page, keyword)
+    count = get_result_count(page)
+    print(f"  → 结果: {count} 条（精确匹配，不存在恰好叫 KS0001 的 SKU）")
+
+    # Test 3: 品名 + 模糊
+    keyword2 = "三角靠枕"
+    print(f"\n[测试3] 品名 + 模糊搜索: {keyword2}")
+    switch_search_type(page, "品名")
+    toggle_search_mode(page, "fuzzy")
+    search_keyword(page, keyword2)
+    count = get_result_count(page)
+    print(f"  → 结果: {count} 条（品名含'三角靠枕'的全部 SKU）")
+
+    print("\n" + "=" * 50)
+
+
 # ─── 浏览器模式 ─────────────────────────────────────────────
 
 def browser_export_flow(page):
@@ -99,11 +222,9 @@ def browser_export_flow(page):
 
     # 2. 弹窗出现 → 点击确定（MCP: getByRole last + browser_evaluate click）
     print("  2. 弹窗出现 → 点确定（导出 44 字段）")
-    page.evaluate("""
-      const btns = document.querySelectorAll('.el-dialog__footer button, .dcm button');
+    page.evaluate("""(() => { const btns = document.querySelectorAll('.el-dialog__footer button, .dcm button');
       const ok = [...btns].find(b => b.textContent.trim() === '确定' && b.offsetParent);
-      if (ok) ok.click();
-    """)
+      if (ok) ok.click(); })()""")
     page.wait_for_timeout(3000)
 
     # 3. 等待后台生成 → 通知出现 → 立即下载 (同 MCP)
@@ -114,11 +235,9 @@ def browser_export_flow(page):
                 print("  3. 文件已生成 → 点击立即下载")
                 # MCP: waitForEvent('download') + click 立即下载
                 with page.expect_download(timeout=30000) as dl_info:
-                    page.evaluate("""
-                      const btns = document.querySelectorAll('button');
+                    page.evaluate("""(() => { const btns = document.querySelectorAll('button');
                       const dl = [...btns].find(b => b.textContent.includes('立即下载'));
-                      if (dl) dl.click();
-                    """)
+                      if (dl) dl.click(); })()""")
                 download = dl_info.value
                 suggested = download.suggested_filename
                 target = DOWNLOADS_DIR / suggested
@@ -133,7 +252,7 @@ def browser_export_flow(page):
     return None
 
 
-def run_browser(headless=False):
+def run_browser(headless=False, demo_search=False):
     """浏览器模式：先登录页 → 用户登录 → 仓库页 → 导出。MCP 实测流程。"""
     first_run = not PROFILE_DIR.exists()
     DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -183,6 +302,12 @@ def run_browser(headless=False):
         page.keyboard.press("Escape")
         page.wait_for_timeout(500)
         print(f"      渲染完成")
+
+        # 如果只是演示搜索切换，不走导出
+        if demo_search:
+            demo_search_switching(page)
+            context.close()
+            return True
 
         # Step 3: 导出
         print("[3/4] 开始导出...")
@@ -344,6 +469,10 @@ def main():
 
     if "--export-cookies" in args:
         export_cookies_cmd()
+        return
+
+    if "--demo-search" in args:
+        run_browser(headless=False, demo_search=True)
         return
 
     fresh = "--fresh" in args
