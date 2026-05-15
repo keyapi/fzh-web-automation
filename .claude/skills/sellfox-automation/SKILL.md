@@ -2,14 +2,17 @@
 name: sellfox-automation
 description: >
   操控赛狐 ERP (sellfox.com) 的仓库库存、商品管理、采购、财务等模块。
-  当用户提到"赛狐"、"Sellfox"、库存明细、仓库导出等时触发。
-  不要用于通途 (Tongtu) — 那是另一个独立系统。
+  当用户提到"赛狐"、"Sellfox"、"sellfox.com"、"库存明细"、"仓库导出"、
+  "sku搜索"、"品名搜索"、"精确/模糊搜索"、"隐藏0数据"、"分页"等时触发。
+  配合 references/code-snippets.md 可直接生成 Python Playwright 代码。
+  不要用于通途 (Tongtu) — 那是另一个独立系统 (见 SKILL_tongtu_automation.md)。
 compatibility: >
-  需要 Playwright MCP 已配置。推荐配合 .claude/skills/ 同级目录下的
-  SKILL_web_automation.md 使用（通用选择器、登录、下载模式）。
+  需要 Playwright MCP 或 Python Playwright (sync_api)。推荐配合
+  SKILL_web_automation.md（通用选择器模式）、references/code-snippets.md（代码模板）。
 metadata:
   platform: Sellfox ERP (Element UI / Vue.js)
   account: fzh (克勇)
+  python_script: sellfox_auto_export.py (浏览器+API 双模式)
   updated: 2026-05-15
 ---
 
@@ -128,6 +131,20 @@ context = p.chromium.launch_persistent_context(
 └── 多仓导出: ❓
 ```
 
+## Quality Checklist（给 Agent 自查）
+
+每次操作赛狐页面时，必须确认以下项：
+
+- [ ] **隐藏0数据**：当前是否勾选？勾选=1494条，不勾选=2281条
+- [ ] **仓库选择**：是全部仓库(空字符串)还是指定仓库(warehouseIds="279814,...")？
+- [ ] **搜索类型**：SKU / 品名 / 识别码？
+- [ ] **搜索模式**：精确(精) / 模糊(模)？
+- [ ] **残留弹窗**：操作前有没有 el-popper 打开着？（先 Escape）
+- [ ] **登录态**：URL 是否含 login？用户菜单("克勇")是否可见？
+- [ ] **更新 reference**：有新发现是否立即写入了 references/*.md？
+
 ## 参考
 
-- [库存明细页](references/warehouse-detailed.md) — 过滤器、导出弹窗、选择器、所有已知 DOM 知识
+- [库存明细页 DOM 知识](references/warehouse-detailed.md) — 所有选择器、行为、踩坑
+- [Python 代码片段](references/code-snippets.md) — 每个 MCP 选择器的 Python Playwright 等价代码
+- [项目主脚本](../sellfox_auto_export.py) — 浏览器+API 双模式完整实现
