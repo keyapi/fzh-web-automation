@@ -240,6 +240,12 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 5. **每次 MCP 探索后立即更新** reference 文件，不积累记忆负担
 6. **中文描述 + 英文选择器**：面向中文用户但代码级内容保持原样
 
+### 运行规则（铁律）
+- **永远用 `uv run python`**，不用 `python` 或 `pip install`
+- **永远用 `uv add <包名>` 加依赖**，自动写入 `pyproject.toml`
+- **worktree venv 需装 Chromium**：`uv run playwright install chromium`
+- **主仓库 venv**（`.venv/`）有完整环境，也优先用 `uv run`
+
 ### Git 提交规则
 - **每次代码修改后立即提交**，不攒一堆
 - **中文提交信息**，格式：`动词: 具体描述`

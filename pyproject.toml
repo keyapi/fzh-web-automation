@@ -7,4 +7,5 @@ dependencies = [
     "pandas>=2.0",
     "openpyxl>=3.0",
     "playwright>=1.40",
+    "requests>=2.32.5",
 ]

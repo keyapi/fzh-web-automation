@@ -43,3 +43,7 @@ outputs/   # legacy (renamed to output/)
 # MCP temporary files
 .playwright-mcp/
 mcp_cookies.json
+sellfox_cookies.json
+
+# Browser persistent profiles (cookies, localStorage)
+sellfox-profile/
