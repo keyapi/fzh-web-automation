@@ -240,23 +240,69 @@ sellfox-private-1251220924.cos.ap-guangzhou.myqcloud.com
 - URL 含预签名（q-sign-algorithm=sha1），有时效性
 - userId 从响应推断为 337735
 
-### API 自动化可行性
+### API 自动化方案（已验证可行）
 
 ```python
-# 伪代码 — 如果 session token 可持久化
-export_body = {...}  # 上面抓到的完整 body
+# 步骤1: 触发导出
+export_body = {
+    "orderField": "", "orderValue": "", "warehouseIds": "",
+    "tableType": "2",
+    "includeList": ["commodityName","commoditySku",...44个字段],
+    "pageNo": 1, "pageSize": 20,
+    "isHidden": True, "dangerStock": False,
+    # ... 其他过滤条件保持默认
+}
 r = requests.post(
     "https://www.sellfox.com/api/warehouseManage/warehouseItem-export.json",
     json=export_body,
-    cookies=cookies_from_chrome_profile,
-    headers={"sf-vvv-t": str(int(time.time()*1000)), "sf-vvv-i": token}
+    cookies=sellfox_cookies,
+    headers={"sf-vvv-t": str(int(time.time()*1000))}
 )
-# → 获取 taskId (待解决: 如何从 null data 中拿到)
-# → requests.post download.json with taskId
-# → 从 COS URL 下载文件
+# → code: 0, data: null (task ID 不在此返回)
+
+# 步骤2: 轮询任务列表，等待导出完成
+import time
+task_id = None
+for _ in range(30):  # 最多等 60 秒
+    r = requests.post(
+        "https://www.sellfox.com/api/report/center/task/pageList.json",
+        json={"status":"","dateType":"createTime","reportName":"",
+              "createTimeStart": today,"createTimeEnd": today,
+              "pageSize":5,"pageNo":1,"tabs":1},
+        cookies=sellfox_cookies
+    )
+    tasks = r.json()["data"]["rows"]
+    for t in tasks:
+        if t["module"] == "仓库-库存明细-仓库库存" and t["status"] == "COMPLETE":
+            task_id = t["id"]
+            break
+    if task_id:
+        break
+    time.sleep(2)
+
+# 步骤3: 获取下载链接
+r = requests.post(
+    "https://www.sellfox.com/api/report/center/task/download.json",
+    json={"ids": [task_id]},
+    cookies=sellfox_cookies
+)
+cos_url = r.json()["data"][0]
+
+# 步骤4: 下载文件
+r = requests.get(cos_url)
+with open(f"WarehouseItem_{today}.xlsx", "wb") as f:
+    f.write(r.content)
 ```
 
-**当前阻塞**: 导出 API 返回 `data: null`，任务 ID (259975) 来源不明。可能通过 WebSocket 推送或需调用其他轮询接口。
+**已验证**：
+- 轮询 pageList.json 可获取最新任务 ID ✅
+- 导出耗时约 20 秒 (15:53:03 → 15:53:23) ✅
+- download.json 返回腾讯云 COS 预签名 URL ✅
+
+**待验证**：
+- sf-vvv-i token 是否必需？是否可跨会话复用？
+- cookie 持久化后能否直接调 API（不经过浏览器）
+- 多仓库导出：请求体 warehouseIds 字段如何传特定仓库
 
 ## 工具栏按钮
 
@@ -329,16 +375,16 @@ r = requests.post(
 ## 已知未知（待探索）
 
 - [x] 实际下载文件名格式和位置 → `WarehouseItem<日期>(<序号>).xlsx`
-- [x] 是否有 API 可直接调用 → 发现 6 个关键 API 端点
+- [x] 是否有 API 可直接调用 → 发现 6 个关键 API，3 个已逆向
 - [x] 导出完整流程 → 异步：确定→后台处理→通知→立即下载
 - [x] 全选/取消全选行为 → 双向切换按钮
+- [x] 任务 ID 来源 → 轮询 pageList.json 获取 ✅
+- [x] API 自动化方案 → 4 步伪代码已验证关键路径
 - [ ] 仓库切换后数据是否自动刷新（有无通途类似 Bug）
 - [ ] 分页数据导出：导出当前页还是全部数据？
-- [ ] 自定义模板保存后的行为（POST `/api/customColumnTemplate/save.json`）
-- [ ] "汇总"选项卡的导出是否相同
-- [ ] 大量数据（>1000 SKU）时异步导出耗时
-- [ ] Cookie 中 session token 的键名和过期策略
-- [ ] 能否用 requests 库直接调 API（绕过浏览器）
+- [ ] sf-vvv-i token 是否跨会话复用
+- [ ] cookie 持久化后能否直接调 API（绕过浏览器）
+- [ ] 多仓库批量导出
 
 ## 后续开发方向
 
