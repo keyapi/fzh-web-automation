@@ -1,7 +1,7 @@
 # 赛狐 — 库存明细页 (Warehouse Detailed Inventory)
 
 > 最后更新: 2026-05-15
-> 探索状态: **初探完成** — 页面结构、过滤器、导出弹窗已摸清。实际下载行为、仓库切换、分页待验证。
+> 探索状态: **深度完成** — 完整导出流程已跑通，API 请求/响应已抓包逆向。仓库切换、任务ID来源待验证。
 
 ---
 
@@ -147,16 +147,116 @@ el-dialog__wrapper.dcm:
 
 ### 发现的 API 端点
 
-| 端点 | 方法 | 用途 |
-|------|------|------|
-| `/api/excel/getHeadField.json` | POST | 获取可导出字段列表（46个） |
-| `/api/warehouseManage/warehouseItem-export.json` | POST | 触发异步导出任务 |
-| `/api/report/center/task/download.json` | POST | 下载已生成的导出文件 |
-| `/api/customColumnTemplate/list.json` | POST | 获取自定义列模板 |
-| `/api/customColumnTemplate/save.json` | POST | 保存自定义列模板 |
-| `/api/gw/.../warehouseItemPageList` | POST | 分页获取库存列表数据 |
+| 端点 | 方法 | 用途 | 状态 |
+|------|------|------|------|
+| `/api/excel/getHeadField.json` | POST | 获取可导出字段列表（46个） | 已发现 |
+| `/api/warehouseManage/warehouseItem-export.json` | POST | 触发异步导出任务 | ✅ 已逆向 |
+| `/api/report/center/task/download.json` | POST | 下载已生成的导出文件 | ✅ 已逆向 |
+| `/api/customColumnTemplate/list.json` | POST | 获取自定义列模板 | 已发现 |
+| `/api/customColumnTemplate/save.json` | POST | 保存自定义列模板 | 已发现 |
+| `/api/gw/.../warehouseItemPageList` | POST | 分页获取库存列表数据 | 已发现 |
 
-> ⚡ **自动化思路**: 如果有 cookie，可以直接调 API 发起导出 → 轮询任务状态 → 下载文件，完全绕过浏览器。
+### API 逆向详情
+
+#### 1. warehouseItem-export.json (触发导出)
+
+**请求 body**:
+```json
+{
+  "orderField": "",
+  "orderValue": "",
+  "warehouseIds": "",       // 空=全部仓库
+  "fullCid": "",
+  "commodityAttrValueIds": "",
+  "isExclusive": "",
+  "attributeValue": null,
+  "labelQuery": 0,
+  "labelIdList": [],
+  "searchType": "exact",    // 精确搜索
+  "searchField": "",
+  "searchValue": "",
+  "productDevIds": "",
+  "commodityDevIds": "",
+  "tableType": "2",         // 2=明细tab, 推测 1=汇总tab
+  "commodityCategories": "",
+  "brandIds": [],
+  "state": "",
+  "shopInfoList": [],
+  "isHidden": true,         // 隐藏0数据记录
+  "dangerStock": false,
+  "pageNo": 1,
+  "pageSize": 20,
+  "includeList": [          // 要导出的44个字段
+    "commodityName","commoditySku","fnSku","mskuList","spu",
+    "spuName","identificationCode","brandName","fullName","stateName",
+    "commodityAttr","commodityAttrCn","model","platform","shopName",
+    "shopNames","country","warehouse","productDevNames","commodityDevName",
+    "shelfInfos","cartonQty","cartonNum","stockPlan","stockWait",
+    "stockInspect","waitUpShelfNum","stockProcessing","stockOccupyAll",
+    "stockAvailable","expectedAvailableQuantity","stockDefective",
+    "stockAllNum","safeStock","perPurchase","perFee","perInventoryCost",
+    "onWayPurchase","onWayFee","totalOnWayCostStock","totalPurchase",
+    "totalFee","inventoryCost","totalCostStockSum","updateTime","label"
+  ]
+}
+```
+
+**成功响应**: `{"code":0, "msg":null, "data":null}`
+- ⚠️ `data` 为 null，任务 ID 可能通过 WebSocket/SSE 推送或需轮询其他接口
+
+**关键请求头**:
+```
+sf-vvv-i: 77a2caf9e5c64b90aeb279714b0d3e3e   ← CSRF/session token
+sf-vvv-t: 1778830833997                        ← 时间戳
+content-type: application/json
+```
+
+#### 2. report/center/task/download.json (下载文件)
+
+**请求 body**: `{"ids": [259975]}` — 任务 ID 数组
+
+**成功响应**:
+```json
+{
+  "code": 0,
+  "msg": "success",
+  "data": [
+    "https://sellfox-private-1251220924.cos.ap-guangzhou.myqcloud.com/
+     sellfox-private/reportCenterTask/337735/0/
+     1778830852264-8d1492a762e2852e2f097aacc25d5fc9/
+     WarehouseItem2026-05-15%280%29.xlsx?q-sign-algorithm=sha1&..."
+  ]
+}
+```
+
+**COS URL 结构**:
+```
+sellfox-private-1251220924.cos.ap-guangzhou.myqcloud.com
+  /sellfox-private/reportCenterTask/{userId}/{0}/
+   {timestamp}-{hash}/WarehouseItem{日期}.xlsx
+```
+
+- 腾讯云 COS（广州节点）
+- URL 含预签名（q-sign-algorithm=sha1），有时效性
+- userId 从响应推断为 337735
+
+### API 自动化可行性
+
+```python
+# 伪代码 — 如果 session token 可持久化
+export_body = {...}  # 上面抓到的完整 body
+r = requests.post(
+    "https://www.sellfox.com/api/warehouseManage/warehouseItem-export.json",
+    json=export_body,
+    cookies=cookies_from_chrome_profile,
+    headers={"sf-vvv-t": str(int(time.time()*1000)), "sf-vvv-i": token}
+)
+# → 获取 taskId (待解决: 如何从 null data 中拿到)
+# → requests.post download.json with taskId
+# → 从 COS URL 下载文件
+```
+
+**当前阻塞**: 导出 API 返回 `data: null`，任务 ID (259975) 来源不明。可能通过 WebSocket 推送或需调用其他轮询接口。
 
 ## 工具栏按钮
 
