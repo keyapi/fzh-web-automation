@@ -185,3 +185,72 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - `mcp_cookies.json` 含密码 hash，**绝不能提交 git**
 - `downloads/` 和 `output/` 含业务数据，**绝不能提交 git**
 - 以上目录已在 `.gitignore` 中排除
+
+---
+
+## 赛狐 (Sellfox) 平台
+
+### 背景
+公司正从通途逐步切换到赛狐 ERP。赛狐是店小秘生态的亚马逊 ERP 系统。
+
+### 平台对比
+
+| 维度 | 通途 | 赛狐 |
+|------|------|------|
+| URL | erp102.tongtool.com | www.sellfox.com |
+| UI 框架 | ExtJS | **Element UI (Vue.js)** |
+| 登录 | passport 统一 | 独立登录 + 拼图滑块 |
+| 仓库选择器 | 自定义 togglebutton | el-select 标准下拉 |
+| 导出方式 | 直接 `<a onclick>` | 图标按钮 → 弹窗选字段 → 确定 |
+| 选择器策略 | onclick 属性 | class/placeholder 属性 |
+
+### 关键选择器模式
+- **下拉框**: `input[placeholder="全部仓库"]` — el-select 组件
+- **按钮**: 可能是纯图标（如 `.icon_sf_download`），页面搜不到文字
+- **弹窗**: `el-dialog` 组件，标题在 `.el-dialog__title`
+- **表格**: `el-table` 或 `vxe-table`
+- **复选框**: `el-checkbox`
+
+### Skill 文件
+详见 `.claude/skills/sellfox-automation/SKILL.md` 及 `references/` 子文件。
+
+当前探索：库存明细页已完成初步 DOM 摸查，导出弹窗结构已掌握，实际下载行为待验证。
+
+---
+
+## Skill 管理规则
+
+### 目录结构
+遵循 [agentskills.io](https://agentskills.io) 规范：
+```
+.claude/skills/<skill-name>/
+├── SKILL.md              # 入口：YAML frontmatter + Markdown 正文
+└── references/           # 按需加载的参考资料（保持一层深度）
+```
+
+### 命名规则
+- 小写 kebab-case：`sellfox-automation`、`warehouse-detailed`
+- 一个 skill 一个职责，多页面用 references/ 拆分
+
+### 编写原则
+1. **SKILL.md 是索引**（<500 行），不堆砌细节
+2. **references/ 放详情**，每页一个 reference 文件
+3. **每个 reference 记录**：URL、页面结构、选择器、操作流程、已知未知、踩坑
+4. **渐进披露**：metadata 常驻（~100 tokens）→ SKILL.md 按需加载 → references 更深按需
+5. **每次 MCP 探索后立即更新** reference 文件，不积累记忆负担
+6. **中文描述 + 英文选择器**：面向中文用户但代码级内容保持原样
+
+### Git 提交规则
+- **每次代码修改后立即提交**，不攒一堆
+- **中文提交信息**，格式：`动词: 具体描述`
+- **及时合并到 main**，避免分支长期分离
+- **保持工作区干净**：提交前检查 `git status`，不留临时文件
+
+### 探索工作流（新页面通用流程）
+1. `browser_navigate` 到目标 URL
+2. 检测登录状态（URL 是否被重定向）
+3. `browser_snapshot` → 太大用 `browser_evaluate` 精准提取
+4. 搜索关键元素：过滤框 (input placeholder)、按钮 (icon class)、表格
+5. 点击关键元素观察行为（弹窗、下载、页面跳转）
+6. **立即记录到 references/**，不等全部探索完
+7. 标记"已知未知"：哪些已验证、哪些待验证

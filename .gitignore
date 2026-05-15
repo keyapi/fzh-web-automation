@@ -28,8 +28,9 @@ Desktop.ini
 # uv
 uv.lock
 
-# Claude Code
-.claude/
+# Claude Code (session data excluded, skills tracked)
+.claude/*
+!.claude/skills/
 
 # Playwright persistent browser profile (cookies, localStorage)
 chrome-profile/
