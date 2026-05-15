@@ -117,9 +117,46 @@ el-dialog__wrapper.dcm:
 总库存成本(¥), 更新时间, 产品标签
 ```
 
-### 实际下载行为
-- **状态**：❓ 未验证（未点击"确定"）
-- **待确认**：文件名格式、下载位置、文件类型 (xlsx/csv)、数据量
+### 完整导出流程（5 步，已验证）
+
+```
+1. 点导出图标 (.icon_sf_download.f_18)
+       ↓
+2. 弹窗出现 (el-dialog) — 46 字段可选，默认勾选 44
+   - 全选 / 取消全选 切换按钮
+   - "恢复默认": 恢复默认勾选（44/46）
+   - "保存为新模板": 保存当前勾选配置
+       ↓
+3. 点"确定" → POST /api/warehouseManage/warehouseItem-export.json
+       ↓
+4. 弹窗关闭，通知出现: "导出文件准备中... 可在报告中心查看"
+   等待 ~2-5 秒后通知变为: "下载文件已完成"
+   通知按钮: [前往报告中心] [立即下载]
+       ↓
+5. 点"立即下载" → POST /api/report/center/task/download.json
+   → 文件下载: WarehouseItem2026-05-15(0).xlsx
+```
+
+
+### 下载文件详情
+- **文件名格式**: `WarehouseItem<YYYY-MM-DD>(<序号>).xlsx`
+- **示例**: `WarehouseItem2026-05-15(0).xlsx`
+- **类型**: XLSX (Excel)
+- **保存位置**: MCP 模式 → `.playwright-mcp/`
+- **含 46 列数据**（与勾选字段对应）
+
+### 发现的 API 端点
+
+| 端点 | 方法 | 用途 |
+|------|------|------|
+| `/api/excel/getHeadField.json` | POST | 获取可导出字段列表（46个） |
+| `/api/warehouseManage/warehouseItem-export.json` | POST | 触发异步导出任务 |
+| `/api/report/center/task/download.json` | POST | 下载已生成的导出文件 |
+| `/api/customColumnTemplate/list.json` | POST | 获取自定义列模板 |
+| `/api/customColumnTemplate/save.json` | POST | 保存自定义列模板 |
+| `/api/gw/.../warehouseItemPageList` | POST | 分页获取库存列表数据 |
+
+> ⚡ **自动化思路**: 如果有 cookie，可以直接调 API 发起导出 → 轮询任务状态 → 下载文件，完全绕过浏览器。
 
 ## 工具栏按钮
 
@@ -167,25 +204,41 @@ el-dialog__wrapper.dcm:
 - **解决**：搜索 `icon_sf_download` 类名
 - **教训**：现代 UI 框架的图标按钮不能靠文字搜索，需搜索 icon class
 
-### 坑 2：Element UI 组件选择器
-- **现象**：`text=汇总` 匹配到 4 个元素（strict mode violation）
-- **原因**：el-radio-button 内部有多个 span 嵌套
-- **解决**：用 `label:has-text("汇总")` 限定到 label 标签
+### 坑 2：Element UI 组件选择器歧义
+- **现象 1**：`text=汇总` 匹配到 4 个元素（strict mode violation）
+- **原因 1**：el-radio-button 内部有多个 span 嵌套
+- **解决 1**：用 `label:has-text("汇总")` 限定到 label 标签
+- **现象 2**：弹窗中有 3 个"确定"按钮（字段区 1 个 disabled + 模板区 1 个 + 底部 1 个 primary）
+- **解决 2**：用 `getByRole('button', {name: '确定'}).last()` 取最后一个
 
 ### 坑 3：页面重定向检测
-- **现象**：未登录时导航到库存页会重定向到首页
+- **现象**：未登录时导航到库存页会重定向到首页（不是登录页！）
 - **检测**：URL 是否为目标 URL（非 `www.sellfox.com/`）
+
+### 坑 4：赛狐导出是异步的（不像通途直接下载）
+- **现象**：点"确定"后弹窗关闭但没有下载
+- **原因**：后台异步生成文件，完成后通知用户
+- **发现**：通知组件 `el-notification` 先显示"准备中"，约 3 秒后变"已完成"
+- **流程**：确定 → 等待后台处理 → 通知出现 → 点击"立即下载"
+
+### 坑 5：Element UI checkbox JS 点击无效
+- **现象**：用 `cb.querySelector('input')?.click()` 勾选 checkbox 不生效
+- **原因**：Element UI 的 checkbox 需要触发 Vue 事件，原生 click 不够
+- **解决**：用 Playwright 的真实鼠标点击（`browser_click`）
 
 ## 已知未知（待探索）
 
-- [ ] 实际下载文件名格式和位置
+- [x] 实际下载文件名格式和位置 → `WarehouseItem<日期>(<序号>).xlsx`
+- [x] 是否有 API 可直接调用 → 发现 6 个关键 API 端点
+- [x] 导出完整流程 → 异步：确定→后台处理→通知→立即下载
+- [x] 全选/取消全选行为 → 双向切换按钮
 - [ ] 仓库切换后数据是否自动刷新（有无通途类似 Bug）
 - [ ] 分页数据导出：导出当前页还是全部数据？
-- [ ] 是否有 API 可直接调用（Network 抓包）
-- [ ] 自定义模板保存后的行为
+- [ ] 自定义模板保存后的行为（POST `/api/customColumnTemplate/save.json`）
 - [ ] "汇总"选项卡的导出是否相同
-- [ ] 大量数据（>1000 SKU）时页面性能
+- [ ] 大量数据（>1000 SKU）时异步导出耗时
 - [ ] Cookie 中 session token 的键名和过期策略
+- [ ] 能否用 requests 库直接调 API（绕过浏览器）
 
 ## 后续开发方向
 
