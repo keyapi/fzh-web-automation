@@ -57,18 +57,27 @@ def is_logged_in(page):
 
 
 def wait_for_login(page):
-    """MCP 实测: 轮询检测 URL 是否已离开登录页"""
+    """MCP 实测: 双重检测 — URL 离开 login + 页面出现用户元素"""
     print(f"\n请在浏览器中登录赛狐（最长等待 {LOGIN_TIMEOUT}s）...")
     print("  登录页: 输入用户名/密码/验证码 → 拼图滑块 → 点登录")
-    for i in range(0, LOGIN_TIMEOUT, 3):
-        time.sleep(3)
+    print("  登录成功后会自动检测并跳转到库存明细页")
+    for i in range(0, LOGIN_TIMEOUT, 2):
+        time.sleep(2)
         url = page.url
-        if "login" not in url and url != "about:blank":
-            print("检测到登录成功！（URL 已跳离登录页）")
-            page.wait_for_timeout(2000)
+        # 检测1: URL 不再含 login（登录成功后跳转到 dashboard 或其他页）
+        if "login" not in url and url != "about:blank" and "sellfox" in url:
+            print(f"✓ 检测到登录成功！(跳转到 {url.split('/')[-1].split('?')[0] or 'dashboard'})")
+            page.wait_for_timeout(1000)
             return True
-        if i % 15 == 0 and i > 0:
-            print(f"  等待登录中... ({i}/{LOGIN_TIMEOUT}s) 当前URL: {url[:80]}")
+        # 检测2: 页面出现用户菜单（可能 AJAX 登录没有跳转）
+        try:
+            if page.locator('text=克勇').first.is_visible():
+                print("✓ 检测到登录成功！(用户菜单可见)")
+                return True
+        except:
+            pass
+        if i % 20 == 0 and i > 0:
+            print(f"  等待登录中... ({i}/{LOGIN_TIMEOUT}s)")
     return False
 
 
@@ -158,12 +167,16 @@ def run_browser(headless=False):
             if not wait_for_login(page):
                 context.close()
                 return False
-            print(f"[!] 登录完成 → cookie 已自动保存到 {PROFILE_DIR}")
-            print(f"[!] 下次运行将免登录！")
+            print(f"    cookie 已自动保存 → 下次免登录！")
 
-        # Step 2: 导航到仓库页并等待渲染
-        print("[2/4] 跳转库存明细页...")
-        page.goto(PAGE_URL, timeout=60000)
+        # Step 2: 确保在仓库页（登录后可能停在 dashboard）
+        current = page.url
+        if "detailed" not in current:
+            print(f"[2/4] 当前在 dashboard → 跳转库存明细页...")
+            page.goto(PAGE_URL, timeout=60000)
+        else:
+            print(f"[2/4] 已在库存明细页")
+        print(f"      URL: {page.url[:80]}")
         print(f"      URL: {page.url[:80]}")
         print(f"      等待 SPA 渲染 (8s)...")
         page.wait_for_timeout(8000)
