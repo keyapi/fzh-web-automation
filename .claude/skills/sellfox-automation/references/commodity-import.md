@@ -170,6 +170,13 @@ with open("商品导入模板.xlsx", "wb") as f:
 - **Content-Type**: `multipart/form-data`
 - **Header**: `sf-vvv-i` (CSRF token, 从页面提取) + `sf-vvv-t` (时间戳)
 - **Response**: `{"code":0, "msg":"", "data":"task_batch_id"}`
+- **关键发现**：导入是**异步的**！API 立即返回 200 + task ID，但前端弹窗会显示"正在导入..."并等待 WebSocket 推送（events.sellfox.com）完成通知。弹窗可能卡住 30 秒+。
+- **Python 自动化策略**：调 API → 得 task ID → 关闭弹窗 → 用 `pageList.json` 搜索 SKU 验证导入结果。不需要等弹窗状态变化。
+
+### 踩坑：导入卡在"正在导入…"
+- **现象**：弹窗显示"状态:正在导入..."几分钟不变
+- **原因**：前端等待 events.sellfox.com 推送完成通知，但 WebSocket 可能断连或延迟
+- **解决**：API 已经返回 200 成功，直接关弹窗。后台异步处理完成即可
 
 ### 踩坑：el-dialog__wrapper 定位
 - 赛狐页面有 **26 个隐藏的 el-dialog__wrapper**，只有 1 个 visible
