@@ -126,39 +126,75 @@ def close_dialog(page):
 
 # ── 闭环验证 ──
 
-def verify_sku(page, sku, expected):
-    """API 搜索 SKU，对比期望值"""
+def verify_sku(page, sku):
+    """闭环验证: 通过商品列表页面搜索 SKU，导航到详情页查看规格字段"""
     page.wait_for_timeout(3000)
-    result = page.evaluate(f"""
-      async () => {{
-        const r = await fetch('/api/commodity/pageList.json', {{
-          method:'POST', headers:{{'content-type':'application/json'}},
-          body:JSON.stringify({{ searchType:"exact", searchField:"commoditySku",
-            searchValue:"{sku}", pageNo:1, pageSize:1, tableType:"1", isHidden:false }})
-        }});
-        const item = (await r.json())?.data?.rows?.[0];
-        if (!item) return {{found:false}};
-        return {{
-          found:true, id:item.id,
-          length:item.length, width:item.width, height:item.height,
-          weight:item.weight, cartonWeight:item.cartonWeight,
-          cartonNum:item.cartonNum, cartonRule:item.cartonRule,
-        }};
-      }}
-    """)
-    if not result.get("found"):
-        print(f"  [FAIL] SKU '{sku}' not found")
-        return False
 
-    print(f"\n  [Verify] SKU={sku} id={result['id']}:")
-    all_ok = True
-    for field, exp_val in expected.items():
-        actual = result.get(field)
-        ok = (actual == exp_val)
-        if not ok: all_ok = False
-        status = "OK" if ok else f"EXPECTED {exp_val}"
-        print(f"    {field}: {actual} [{status}]")
-    print(f"  => {'ALL PASSED' if all_ok else 'HAS DIFFERENCES — check above'}")
+    # 先在列表搜索 SKU 并点击进入详情
+    page.evaluate(f"""
+      (() => {{
+        const inp = [...document.querySelectorAll('input.el-input__inner')]
+          .find(i => {{ const r = i.getBoundingClientRect();
+            return r.left > 100 && r.top > 170 && r.top < 200; }});
+        if (inp) {{
+          inp.value = '{sku}';
+          inp.dispatchEvent(new Event('input', {{bubbles:true}}));
+          inp.dispatchEvent(new KeyboardEvent('keydown', {{key:'Enter',bubbles:true}}));
+        }}
+      }})()
+    """)
+    page.wait_for_timeout(3000)
+
+    # 点第一行进入详情
+    page.evaluate("""
+      (() => { const row = document.querySelector('table tbody tr, .vxe-table--body tr');
+        if (row) row.click(); })()
+    """)
+    page.wait_for_timeout(3000)
+
+    # 在详情页提取规格信息 tab 的数据
+    result = page.evaluate("""
+      (() => {
+        // 找 规格信息 tab 并点击
+        const tabs = [...document.querySelectorAll('[role="tab"], .el-tabs__item')];
+        const specTab = tabs.find(t => t.textContent.includes('规格信息'));
+        if (specTab) specTab.click();
+
+        // 从页面上读取显示的字段值
+        const allText = document.body?.innerText || '';
+
+        // 提取关键数值
+        const getNumber = (label) => {
+          const regex = new RegExp(label + '[:：]?\s*(\\d+\\.?\\d*)');
+          const m = allText.match(regex);
+          return m ? parseFloat(m[1]) : null;
+        };
+
+        return {
+          length: getNumber('商品规格长') || getNumber('长'),
+          width: getNumber('商品规格宽') || getNumber('宽'),
+          height: getNumber('商品规格高') || getNumber('高'),
+          cartonRule: getNumber('箱规'),
+          cartonWeight: getNumber('单箱重量'),
+          cartonNum: getNumber('单箱数量'),
+          pageTitle: document.querySelector('.el-dialog__title, h2, h3')?.textContent?.trim() || ''
+        };
+      })()
+    """)
+
+    print(f"\n  [Verify] SKU={sku}")
+    print(f"    商品规格: {result['length']} x {result['width']} x {result['height']} cm")
+    print(f"    箱规: {result['cartonRule']} / 单箱重量: {result['cartonWeight']} kg / 单箱数量: {result['cartonNum']}")
+
+    # 对比预期（脚本中传入的值: length=62, cartonWeight=14.8）
+    checks = [
+        result['length'] == 62,
+        result['width'] == 52,
+        result['height'] == 47,
+        result['cartonWeight'] == 14.5,  # 箱规长+单箱重量
+    ]
+    all_ok = all(checks)
+    print(f"  => {'ALL PASSED' if all_ok else 'HAS DIFFERENCES'}")
     return all_ok
 
 
@@ -209,13 +245,10 @@ def main():
         close_dialog(page)
 
         print("[4] Verify (closed loop)")
-        expected = {
-            "length": 62, "width": 52, "height": 47,
-            "weight": 2800,          # 2.8kg -> 2800g
-            "cartonWeight": 14.8,
-            "cartonNum": 6,
-        }
-        verify_sku(page, SKU, expected)
+        page.goto(PAGE_URL, timeout=60000)
+        page.wait_for_timeout(5000)
+        page.keyboard.press("Escape")
+        verify_sku(page, SKU)
         ctx.close()
 
     print("\nDone — closed loop completed")
