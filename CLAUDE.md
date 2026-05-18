@@ -42,7 +42,11 @@
 ├── SKILL_quick_start.md       # Skill: 通用环境安装
 ├── SKILL_web_automation.md    # Skill: 浏览器自动化通用模式
 ├── SKILL_deploy_playwright_mcp.md  # Skill: MCP 部署详解
-└── SKILL_tongtu_automation.md     # Skill: 通途专项自动化
+├── SKILL_tongtu_automation.md     # Skill: 通途专项自动化
+├── sellfox_auto_export.py          # 赛狐库存导出（浏览器+API）
+├── sellfox_import_update.py        # 赛狐商品导入更新（闭环验证）
+├── commodity_import_template.py    # 赛狐下载商品导入模板
+└── sellfox-profile/                # 赛狐持久化登录 (gitignore)
 ```
 
 ## 运行方式
@@ -134,6 +138,24 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - 调试 worktree (`.claude/worktrees/`) 在独立分支
 - 两个独立工作区，互不干扰，完成后 merge 回 main
 
+### 坑 9：赛狐页面 20+ 隐藏 dialog（关键！）
+- **现象**：`document.querySelector('.el-dialog__wrapper')` 拿到第一个（是隐藏的空壳）
+- **原因**：赛狐所有弹窗预渲染在 DOM 中，只有 1 个 visible
+- **解决**：**永远**用 `.filter(d => d.getBoundingClientRect().width > 0)` 过滤
+
+### 坑 10：Element UI checkbox 不能用 evaluate click
+- **现象**：`cb.click()` 在 evaluate 中不改变 Vue 组件状态
+- **解决**：必须用 Playwright `page.locator().click()` 真实点击
+
+### 坑 11：赛狐导入 Excel 的 sheet 名陷阱
+- **现象**：`pd.to_excel()` 生成的文件导入卡在"正在导入"
+- **根因**：赛狐模板 sheet 名必须是 `商品`（默认 `Sheet1` 不认）
+- **解决**：`ExcelWriter(sheet_name='商品')` + 不复用模板文件
+
+### 坑 12：el-dropdown-menu__item 对 Playwright 不可见
+- **现象**：Playwright click 超时 (element not visible)
+- **解决**：使用 `page.evaluate("item.click()")` 绕过可见性检查
+
 ## 通途页面 DOM 知识
 
 ### 仓库选择器（非标准 `<select>`）
@@ -214,7 +236,14 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 ### Skill 文件
 详见 `.claude/skills/sellfox-automation/SKILL.md` 及 `references/` 子文件。
 
-当前探索：库存明细页已完成初步 DOM 摸查，导出弹窗结构已掌握，实际下载行为待验证。
+当前探索：库存明细页已完成 DOM 摸查+导出弹窗+API逆向+Python脚本。商品导入页已完成下载模板+上传导入全流程。
+
+### 赛狐 Excel 导入（关键教训）
+- **必须 sheet_name='商品'**：模板文件有 3 个 sheet (`['商品','hidden1','hidden2']`)，`pd.to_excel()` 默认 `Sheet1` 会被赛狐拒绝
+- **禁止 pd.read_excel(模板)**：读模板会带 hidden sheet，`to_excel` 后丢失这些 sheet → 导入卡死
+- **正确做法**：只取表头列名 → `pd.DataFrame()` 构造数据 → `ExcelWriter(sheet_name='商品')` 写入
+- **文件上传**：Python Playwright 用 `expect_file_chooser` + `set_files()`，或直接用 `set_input_files`
+- **上传后弹窗**：`POST /excel/import.json` (multipart/form-data) 返回 200+taskID，但前端等 WebSocket 通知
 
 ---
 

@@ -147,7 +147,8 @@ context = p.chromium.launch_persistent_context(
 
 ## 参考
 
-- [库存明细页](references/warehouse-detailed.md) — 所有选择器、行为、踩坑
-- [商品导入](references/commodity-import.md) — 导入更新商品弹窗、checkbox、下载模板 API
-- [Python 代码片段](references/code-snippets.md) — MCP 选择器→Python Playwright 代码
-- [项目主脚本](../sellfox_auto_export.py) — 浏览器+API 双模式完整实现
+- [库存明细页](references/warehouse-detailed.md) — 选择器、导出弹窗、API逆向、全部已知未知已闭环
+- [商品导入](references/commodity-import.md) — 导入更新商品弹窗(69字段)、下载模板、上传文件API、Excel格式陷阱
+- [Python 代码片段](references/code-snippets.md) — MCP 选择器→Python Playwright 代码（含文件上传）
+- [项目主脚本-库存导出](../sellfox_auto_export.py) — 浏览器+API 双模式
+- [项目主脚本-商品导入](../sellfox_import_update.py) — 生成Excel→上传→闭环验证
