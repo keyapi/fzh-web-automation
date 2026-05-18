@@ -122,8 +122,11 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - **解决**：必须**新建对话**。MCP 只在 session 启动时加载
 
 ### 坑 5：中文路径编码（Windows）
-- **现象**：`subprocess.run()` 读 stdout 报 `UnicodeDecodeError: 'gbk'`
-- **解决**：`subprocess.run(..., encoding="utf-8", errors="replace")`
+- **现象 1**：`subprocess.run()` 读 stdout 报 `UnicodeDecodeError: 'gbk'`
+- **解决 1**：`subprocess.run(..., encoding="utf-8", errors="replace")`
+- **现象 2**：Python print 中文/Unicode 直接崩溃（`UnicodeEncodeError: 'gbk' codec can't encode character`）
+- **根因**：Windows 下 Python stdout 默认 GBK 编码，不能处理 ✓ 等 Unicode 字符
+- **解决 2**：每个脚本开头加 `sys.stdout.reconfigure(encoding='utf-8')`，所有 8 个 py 文件均已内置
 
 ### 坑 6：下载路径差异
 - **Python 脚本**：`page.expect_download()` 精确控制保存位置 (`downloads/`)

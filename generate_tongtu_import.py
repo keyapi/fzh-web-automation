@@ -7,6 +7,8 @@
 import sys, os
 import pandas as pd
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 TEMPLATE_COLS = ['SKU/SKU别名(必填)', '安全库存', '头程报关费（CNY）', '头程运费（CNY）', '其他费用（CNY）']
 
 def read_inventory(path):

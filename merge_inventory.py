@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 import pandas as pd
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 DOWNLOADS_DIR = SCRIPT_DIR / "downloads"
 OUTPUT_DIR = SCRIPT_DIR / "output"

@@ -25,6 +25,8 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
 DOWNLOADS_DIR = SCRIPT_DIR / "downloads"

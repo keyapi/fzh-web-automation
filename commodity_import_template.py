@@ -17,11 +17,13 @@ MCP 探索验证过的操作流程：
   不能用 pd.read_excel(模板) 再改——模板有隐藏 sheet/格式会导致导入失败。
 """
 
-import time, json, requests
+import time, json, requests, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from datetime import datetime
 import pandas as pd
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"

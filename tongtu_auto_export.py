@@ -21,6 +21,8 @@ import subprocess, sys, time, shutil, json
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
+sys.stdout.reconfigure(encoding='utf-8')
+
 TONGTU_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?warehouse=1&isFirstInto=1"
 SCRIPT_DIR = Path(__file__).parent
 PROFILE_DIR = SCRIPT_DIR / "chrome-profile"

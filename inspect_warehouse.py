@@ -2,9 +2,11 @@
 诊断脚本：抓取通途库存结存页面的仓库选择器 DOM 结构
 用法: uv run python inspect_warehouse.py
 """
-import json
+import json, sys
 from pathlib import Path
 from playwright.sync_api import sync_playwright
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 TONGTU_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?warehouse=1&isFirstInto=1"
 SCRIPT_DIR = Path(__file__).parent
