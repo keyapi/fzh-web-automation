@@ -173,21 +173,25 @@ with open("商品导入模板.xlsx", "wb") as f:
 - **关键发现**：导入是**异步的**！API 立即返回 200 + task ID，但前端弹窗显示"正在导入..."等待 WebSocket 推送
 - **Python 自动化策略**：调 API → 关弹窗 → 搜索验证。不需要等弹窗状态。
 
-### 踩坑：导入 Excel 格式问题（最重要！）
-- **现象**：用 `pd.read_excel(模板)` → 修改 → `to_excel()` → 上传后数据不更新
-- **根因**：赛狐模板有隐藏 worksheet/特殊格式，`read_excel` 读取时带入了干扰
-- **解决**：**只取表头列名，用 `pd.DataFrame()` 构造新数据，`pd.to_excel()` 生成全新文件**
-  ```python
-  # ✅ 正确做法
-  cols = ['*SKU', '商品规格长(cm)', ...]
-  df = pd.DataFrame([[ 'test001-white', 60, 50, ... ]], columns=cols)
-  df.to_excel('import.xlsx', index=False)
-  
-  # ❌ 错误做法
-  template = pd.read_excel('模板.xlsx')  # 带入了隐藏sheet/格式
-  template.loc[0] = [...]  
-  template.to_excel('import.xlsx')  # 可能有问题
-  ```
+### 踩坑：导入 Excel 格式问题（最重要！有两个陷阱）
+
+**陷阱 1**：不能用 `pd.read_excel(模板)` 再改
+- 模板有隐藏 worksheet (`['商品', 'hidden1', 'hidden2']`)
+- `read_excel` + `to_excel` 会丢失隐藏 sheet，导致导入挂起
+
+**陷阱 2**：sheet 名必须是 `商品`
+- `pd.to_excel()` 默认 sheet 名是 `Sheet1`——赛狐不认，导入卡住
+- 必须 `sheet_name='商品'`
+
+**✅ 正确做法**：
+```python
+cols = ['*SKU', '商品规格长(cm)', ...]
+df = pd.DataFrame([['test001-white', 60, 50, ...]], columns=cols)
+with pd.ExcelWriter('import.xlsx', engine='openpyxl') as w:
+    df.to_excel(w, sheet_name='商品', index=False)
+```
+
+**闭环验证**：弹窗显示 "成功1条，失败0条"
 - **闭环验证**：上传后弹窗显示 "成功1条，失败0条"
 
 ### 踩坑：MCP 浏览器文件选择器不弹出

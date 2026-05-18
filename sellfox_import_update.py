@@ -1,19 +1,25 @@
 #!/usr/bin/env python3
 """
-赛狐商品导入更新 — 最稳方案（全浏览器点击 + 已知成功文件）
+赛狐商品导入更新 — 闭环验证版
 
 用法:
   uv run python sellfox_import_update.py
 
-策略:
-  - 先用用户手动验证过的成功文件测试导入流程
-  - 全量浏览器点击（不跳过任何步骤）
-  - 验证弹窗"导入完成"文字
+流程:
+  1. pd.DataFrame() 生成新 Excel（不复用模板！）
+  2. 浏览器点击上传导入
+  3. API 搜索 SKU 验证数据是否更新（闭环）
+
+踩坑:
+  - Excel 必须 pd.DataFrame() 直接构造，不能用 pd.read_excel(模板)
+  - 模板有隐藏 worksheet/格式，读取后会干扰导入
 """
 
 import time, sys
 from pathlib import Path
+import pandas as pd
 from playwright.sync_api import sync_playwright
+from datetime import datetime
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
@@ -22,10 +28,20 @@ DOWNLOADS_DIR = SCRIPT_DIR / "downloads"
 LOGIN_URL = "https://www.sellfox.com/amzup-web-main/login.html"
 PAGE_URL  = "https://www.sellfox.com/amzup-web-main/web/commodity/index.html"
 
-# 用户已验证成功上传的文件
-WORKING_FILE = DOWNLOADS_DIR / "working_import.xlsx"
+# 规格信息 16 列（含 *SKU）—— 从下载模板 API 验证过的表头
+COLUMNS = [
+    "*SKU",
+    "商品规格长(cm)", "商品规格宽(cm)", "商品规格高(cm)",
+    "商品重量", "商品重量单位",
+    "箱规长(cm)", "箱规宽(cm)", "箱规高(cm)",
+    "单箱重量(kg)", "单箱数量(PCS)",
+    "商品包装规格长(cm)", "商品包装规格宽(cm)", "商品包装规格高(cm)",
+    "商品包装重量", "商品包装重量单位",
+]
 
-# ── 登录 ────────────────────────────────────────────────────
+SKU = "test001-white"
+
+# ── 登录 ──
 
 def is_logged_in(page):
     try:
@@ -47,133 +63,162 @@ def wait_for_login(page):
             return True
     return False
 
-# ── 导入流程 ────────────────────────────────────────────────
+# ── 生成 Excel ──
+
+def make_import_excel(sku, data_15, path):
+    """
+    生成导入 Excel —— 不复用模板文件！
+
+    踩坑: sheet 名必须是 '商品'（赛狐模板的默认名），
+    不能用 pd.to_excel() 默认的 'Sheet1'
+    也不能 pd.read_excel(模板) — 模板有 hidden1/hidden2 隐藏 sheet
+    """
+    df = pd.DataFrame([[sku] + list(data_15)], columns=COLUMNS)
+    with pd.ExcelWriter(path, engine='openpyxl') as w:
+        df.to_excel(w, sheet_name='商品', index=False)
+    print(f"  Generated: {path.name} ({len(df)} rows)")
+
+# ── 上传导入 ──
 
 def do_import(page, file_path):
-    """
-    最稳方案: 全浏览器点击
-    1. 打开导入下拉 → 选"导入更新商品"
-    2. 弹窗中勾选"规格信息"
-    3. 点击"添加文件" → 文件选择器 → 选文件
-    4. 点击"导入" → 等待完成
-    """
-    # 1. 打开导入下拉
-    print("  1. 展开导入下拉菜单...")
-    page.evaluate(
-        "(() => { [...document.querySelectorAll('button')]"
-        ".find(b => b.textContent.trim() === '导入')?.click(); })()"
-    )
+    print("  [Import] Opening dialog...")
+    page.evaluate("(() => { [...document.querySelectorAll('button')]"
+                  ".find(b=>b.textContent.trim()==='导入')?.click(); })()")
     page.wait_for_timeout(800)
-
-    # 2. 选"导入更新商品"
-    print("  2. 选择 导入更新商品...")
-    page.evaluate(
-        "(() => { [...document.querySelectorAll('.el-dropdown-menu__item')]"
-        ".find(i => i.textContent.trim() === '导入更新商品')?.click(); })()"
-    )
+    page.evaluate("(() => { [...document.querySelectorAll('.el-dropdown-menu__item')]"
+                  ".find(i=>i.textContent.trim()==='导入更新商品')?.click(); })()")
     page.wait_for_timeout(3000)
 
-    # 3. 滚动弹窗 + 勾选规格信息
-    print("  3. 勾选 规格信息...")
-    page.evaluate(
-        "(() => { const b = document.querySelector('.el-dialog__body');"
-        " if (b) b.scrollTop = b.scrollHeight; })()"
-    )
-    page.wait_for_timeout(500)
-    page.locator(
-        '.el-checkbox:has(.el-checkbox__label:text-is("规格信息"))'
-    ).click()
-    page.wait_for_timeout(500)
+    print("  [Import] Checking spec-info...")
+    page.evaluate("(() => { const b=document.querySelector('.el-dialog__body');"
+                  " if(b) b.scrollTop=b.scrollHeight; })()")
+    page.wait_for_timeout(300)
+    page.locator('.el-checkbox:has(.el-checkbox__label:text-is("规格信息"))').click()
+    page.wait_for_timeout(300)
 
-    # 4. 上传文件
-    print(f"  4. 上传文件: {file_path.name}...")
+    print(f"  [Import] Uploading: {file_path.name}")
     with page.expect_file_chooser() as fc:
-        page.locator(
-            '.el-button--primary:has-text("添加文件")'
-        ).click()
+        page.locator('.el-button--primary:has-text("添加文件")').click()
     fc.value.set_files(str(file_path.resolve()))
     page.wait_for_timeout(800)
 
-    # 5. 点导入
-    print("  5. 点击导入...")
+    print("  [Import] Clicking import...")
     page.get_by_role("button", name="导入", exact=True).click()
 
-    # 6. 等待完成
-    print("  6. 等待处理...")
     for sec in range(120):
         text = page.evaluate(
-            "(() => { const d = [...document.querySelectorAll('.el-dialog__wrapper')]"
-            ".find(x => x.getBoundingClientRect().width > 0);"
-            " return d?.textContent?.trim()?.substring(0, 200) || ''; })()"
-        )
+            "(() => { const d=[...document.querySelectorAll('.el-dialog__wrapper')]"
+            ".find(x=>x.getBoundingClientRect().width>0);"
+            "return d?.textContent?.trim()?.substring(0,200)||''; })()")
         if "导入完成" in text:
-            print(f"     [OK] {text.strip()}")
+            print(f"  [OK] {text.strip()}")
             return True
-        if "失败" in text and "成功" not in text:
-            print(f"     [FAIL] {text.strip()}")
-            return False
-        if sec % 15 == 0 and sec > 0:
-            print(f"     等待中... ({sec}s)")
+        if sec % 20 == 0 and sec > 0:
+            print(f"       waiting... ({sec}s)")
         time.sleep(1)
-
-    print("     [WARN] 超时 120s")
+    print("  [WARN] Timeout 120s")
     return False
 
-
 def close_dialog(page):
-    page.evaluate(
-        "(() => { const d = [...document.querySelectorAll('.el-dialog__wrapper')]"
-        ".find(x => x.getBoundingClientRect().width > 0);"
-        " d?.querySelector('.el-dialog__headerbtn')?.click(); })()"
-    )
+    page.evaluate("(() => { const d=[...document.querySelectorAll('.el-dialog__wrapper')]"
+                  ".find(x=>x.getBoundingClientRect().width>0);"
+                  "d?.querySelector('.el-dialog__headerbtn')?.click(); })()")
 
+# ── 闭环验证 ──
+
+def verify_sku(page, sku, expected):
+    """API 搜索 SKU，对比期望值"""
+    page.wait_for_timeout(3000)
+    result = page.evaluate(f"""
+      async () => {{
+        const r = await fetch('/api/commodity/pageList.json', {{
+          method:'POST', headers:{{'content-type':'application/json'}},
+          body:JSON.stringify({{ searchType:"exact", searchField:"commoditySku",
+            searchValue:"{sku}", pageNo:1, pageSize:1, tableType:"1", isHidden:false }})
+        }});
+        const item = (await r.json())?.data?.rows?.[0];
+        if (!item) return {{found:false}};
+        return {{
+          found:true, id:item.id,
+          length:item.length, width:item.width, height:item.height,
+          weight:item.weight, cartonWeight:item.cartonWeight,
+          cartonNum:item.cartonNum, cartonRule:item.cartonRule,
+        }};
+      }}
+    """)
+    if not result.get("found"):
+        print(f"  [FAIL] SKU '{sku}' not found")
+        return False
+
+    print(f"\n  [Verify] SKU={sku} id={result['id']}:")
+    all_ok = True
+    for field, exp_val in expected.items():
+        actual = result.get(field)
+        ok = (actual == exp_val)
+        if not ok: all_ok = False
+        status = "OK" if ok else f"EXPECTED {exp_val}"
+        print(f"    {field}: {actual} [{status}]")
+    print(f"  => {'ALL PASSED' if all_ok else 'HAS DIFFERENCES — check above'}")
+    return all_ok
+
+
+# ── main ──
 
 def main():
     DOWNLOADS_DIR.mkdir(exist_ok=True)
 
-    if not WORKING_FILE.exists():
-        print(f"错误: 找不到 {WORKING_FILE}")
-        print("请先确保已知成功文件存在")
-        sys.exit(1)
+    # 测试数据 — 每次改数字以验证真正更新
+    test_data = [
+        62, 52, 47,         # 规格长/宽/高(cm) — 改过
+        2.8, 'kg',          # 重量 + 单位 — 改过
+        68, 58, 52,         # 箱规 — 改过
+        14.8, 6,            # 单箱重量(kg) + 数量 — 改过
+        17, 14, 3,          # 包装规格 — 改过
+        0.24, 'kg'          # 包装重量 + 单位 — 改过
+    ]
+    ts = datetime.now().strftime("%H%M%S")
+    file_path = DOWNLOADS_DIR / f"import_{SKU}_{ts}.xlsx"
+
+    print("[1] Generate Excel (pd.DataFrame, no template)")
+    make_import_excel(SKU, test_data, file_path)
 
     with sync_playwright() as p:
         ctx = p.chromium.launch_persistent_context(
             user_data_dir=str(PROFILE_DIR),
-            headless=False,
-            accept_downloads=True,
+            headless=False, accept_downloads=True,
             viewport={"width": 1280, "height": 800},
         )
         page = ctx.pages[0] if ctx.pages else ctx.new_page()
 
-        # 登录
-        print("[Start] 打开商品列表页...")
+        print("[2] Login check...")
         page.goto(PAGE_URL, timeout=60000)
         page.wait_for_timeout(5000)
-
         if is_logged_in(page):
-            print("       已登录")
+            print("     Already logged in")
         else:
             page.goto(LOGIN_URL, timeout=30000)
             if not wait_for_login(page):
-                ctx.close(); return
+                ctx.close(); sys.exit(1)
             page.goto(PAGE_URL, timeout=60000)
             page.wait_for_timeout(8000)
-
         page.keyboard.press("Escape")
         page.wait_for_timeout(500)
 
-        # 导入
-        print("[Import] 开始导入流程...")
-        ok = do_import(page, WORKING_FILE)
+        print("[3] Upload & Import")
+        ok = do_import(page, file_path)
         close_dialog(page)
 
-        if ok:
-            print("\n[Done] 导入成功！")
-        else:
-            print("\n[Done] 导入可能未完成，请手动检查")
-
+        print("[4] Verify (closed loop)")
+        expected = {
+            "length": 62, "width": 52, "height": 47,
+            "weight": 2800,          # 2.8kg -> 2800g
+            "cartonWeight": 14.8,
+            "cartonNum": 6,
+        }
+        verify_sku(page, SKU, expected)
         ctx.close()
 
+    print("\nDone — closed loop completed")
 
 if __name__ == "__main__":
     main()
