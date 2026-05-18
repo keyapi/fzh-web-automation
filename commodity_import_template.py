@@ -11,12 +11,17 @@ MCP 探索验证过的操作流程：
 
 用法:
   uv run python commodity_import_template.py
+
+关键踩坑:
+  Excel 生成必须用 pd.DataFrame() 直接构造（只取表头列名），
+  不能用 pd.read_excel(模板) 再改——模板有隐藏 sheet/格式会导致导入失败。
 """
 
 import time, json, requests
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 from datetime import datetime
+import pandas as pd
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
@@ -223,6 +228,29 @@ def main():
     print("[6/6] 读取模板内容...")
     read_template(path)
     print("\n完成！")
+
+
+def create_import_excel(sku, spec_data, output_path):
+    """
+    创建赛狐导入 Excel — 只取表头，用 DataFrame 直接构造
+
+    ⚠️ 关键: 不能 pd.read_excel(模板) 再改——模板有隐藏 sheet/格式！
+    已验证: 弹窗显示"成功1条，失败0条"
+    """
+    columns = [
+        "*SKU",
+        "商品规格长(cm)", "商品规格宽(cm)", "商品规格高(cm)",
+        "商品重量", "商品重量单位",
+        "箱规长(cm)", "箱规宽(cm)", "箱规高(cm)",
+        "单箱重量(kg)", "单箱数量(PCS)",
+        "商品包装规格长(cm)", "商品包装规格宽(cm)", "商品包装规格高(cm)",
+        "商品包装重量", "商品包装重量单位",
+    ]
+    row = [sku, *spec_data] if len(spec_data) == len(columns) - 1 else [sku] + spec_data[:15]
+    df = pd.DataFrame([row], columns=columns)
+    df.to_excel(output_path, index=False)
+    print(f"导入文件已生成: {output_path}")
+    return output_path
 
 
 if __name__ == "__main__":

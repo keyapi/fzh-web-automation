@@ -173,13 +173,22 @@ with open("商品导入模板.xlsx", "wb") as f:
 - **关键发现**：导入是**异步的**！API 立即返回 200 + task ID，但前端弹窗显示"正在导入..."等待 WebSocket 推送
 - **Python 自动化策略**：调 API → 关弹窗 → 搜索验证。不需要等弹窗状态。
 
-### 踩坑：导入 API 200 但数据未更新（闭环验证失败）
-- **现象**：POST /excel/import.json 返回 200 + task ID，但搜索 SKU 发现数据没变
-- **排查中**：可能的根因：
-  1. Excel 列名（中文表头）映射到 API 字段 key 的方式待确认
-  2. 勾选的"规格信息"字段与 Excel 列名不匹配
-  3. 导入可能是异步批处理（延迟数分钟）
-- **待验证**：直接用 commodity 更新 API 写字段 vs 走导入流程
+### 踩坑：导入 Excel 格式问题（最重要！）
+- **现象**：用 `pd.read_excel(模板)` → 修改 → `to_excel()` → 上传后数据不更新
+- **根因**：赛狐模板有隐藏 worksheet/特殊格式，`read_excel` 读取时带入了干扰
+- **解决**：**只取表头列名，用 `pd.DataFrame()` 构造新数据，`pd.to_excel()` 生成全新文件**
+  ```python
+  # ✅ 正确做法
+  cols = ['*SKU', '商品规格长(cm)', ...]
+  df = pd.DataFrame([[ 'test001-white', 60, 50, ... ]], columns=cols)
+  df.to_excel('import.xlsx', index=False)
+  
+  # ❌ 错误做法
+  template = pd.read_excel('模板.xlsx')  # 带入了隐藏sheet/格式
+  template.loc[0] = [...]  
+  template.to_excel('import.xlsx')  # 可能有问题
+  ```
+- **闭环验证**：上传后弹窗显示 "成功1条，失败0条"
 
 ### 踩坑：MCP 浏览器文件选择器不弹出
 - **现象**：手动点击"添加文件"在 MCP 浏览器中无反应
