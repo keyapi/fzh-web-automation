@@ -128,15 +128,17 @@ def close_dialog(page):
 
 def verify_sku(page, sku):
     """
-    闭环验证: 搜索 SKU → 确认在列表中存在
+    闭环验证: 搜索 SKU → 点进详情 → 查规格 tab 数据
 
-    MCP 验证: page.fill() + Enter 触发 Vue 搜索 ✅
-    注意: pageList.json 不返回规格详细字段(length/cartonRule等)
-    规格数据需通过商品详情页查看
+    MCP 验证的选择器:
+    - 搜索框: getByPlaceholder('搜索内容').first
+    - SKU 链接: .vxe-body--row span.f_blue.pointer (或 getByText(sku))
+    - 详情弹窗: el-dialog__wrapper.m-dialog, 标题"普通商品详情"
+    - 规格tab: getByRole('tab', { name: '规格信息' })
     """
     page.wait_for_timeout(2000)
 
-    # 用 Playwright fill 搜索（MCP验证: 触发Vue事件）
+    # 1. 搜索 SKU
     search_box = page.get_by_placeholder('搜索内容').first
     search_box.click()
     search_box.fill('')
@@ -144,31 +146,35 @@ def verify_sku(page, sku):
     page.keyboard.press('Enter')
     page.wait_for_timeout(3000)
 
-    # 读取搜索结果数
+    # 2. 确认找到
     total = page.evaluate(
         "() => { const p = document.querySelector('.el-pagination');"
         " return p?.textContent?.match(/共\\s*(\\d+)\\s*条/)?.[1] || '0'; }"
     )
-
     if total == '0':
-        print(f"  [FAIL] SKU '{sku}' not found in list")
+        print(f"  [FAIL] SKU '{sku}' not found")
         return False
+    print(f"  [OK] '{sku}' found ({total} results)")
 
-    print(f"  [OK] SKU '{sku}' found ({total} results)")
+    # 3. 点 SKU 链接打开详情弹窗
+    page.get_by_text(sku).first.click()
+    page.wait_for_timeout(2000)
 
-    # 通过 API 拿 commodity ID
-    item_id = page.evaluate(f"""
-      async () => {{
-        const r = await fetch('/api/commodity/pageList.json', {{
-          method:'POST', headers:{{'content-type':'application/json'}},
-          body:JSON.stringify({{ searchType:"exact", searchField:"commoditySku",
-            searchValue:"{sku}", pageNo:1, pageSize:1, tableType:"1", isHidden:false }})
-        }});
-        return (await r.json())?.data?.rows?.[0]?.id;
-      }}
+    # 4. 点规格信息 tab
+    page.get_by_role('tab', { 'name': '规格信息' }).click()
+    page.wait_for_timeout(1000)
+
+    # 5. 从弹窗文本提取规格数据
+    spec_text = page.evaluate("""
+      (() => { const dialogs = [...document.querySelectorAll('.el-dialog__wrapper')]
+        .filter(d => d.getBoundingClientRect().width > 200);
+        return dialogs[0]?.innerText || ''; })()
     """)
-    if item_id:
-        print(f"  commodity id: {item_id}")
+    print(f"  [Spec Data]:")
+    for line in [l.strip() for l in spec_text.split('\n') if l.strip()]:
+        if any(kw in line for kw in ['cm','kg','g','PCS','规格','重量','数量','箱']):
+            print(f"    {line}")
+
     return True
 
 

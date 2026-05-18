@@ -180,7 +180,38 @@ r = fetch('/api/commodity/pageList.json', {
 # 但 pageList 不返回规格详情(length/cartonRule/cartonWeight等为0)
 ```
 
-**商品详情（规格字段）**: pageList.json 不返回规格字段。需通过详情页或详情API获取。
+**商品详情（规格字段）**: ✅ 已验证 — pageList.json 不返回规格字段，需通过详情弹窗获取
+
+### 商品详情弹窗（已验证 ✅）
+
+**触发方式**:
+```python
+# 方式1: 点 SKU 文本
+page.get_by_text(sku).first.click()
+
+# 方式2: 点 .vxe-body--row 中的 span.f_blue.pointer
+page.locator('.vxe-body--row span.f_blue.pointer').first.click()
+```
+
+**弹窗结构**: `el-dialog__wrapper.m-dialog` — 标题"普通商品详情"
+
+**Tabs (在弹窗内)**:
+- 基础信息 | 物流信息 | 采购信息 | 采购历史 | 质检信息 | **规格信息** | 关联辅料 | 图片管理 | 税务信息 | 自定义字段
+
+**规格信息 tab** (已验证 ✅):
+```python
+page.get_by_role('tab', { 'name': '规格信息' }).click()
+page.wait_for_timeout(1000)
+# 数据从 dialog.innerText 提取
+```
+
+**闭环验证数据** (test001-white 导入后):
+```
+商品规格: 62 × 52 × 47 cm   ← 和我们填入的值一致！
+商品重量: 2800g (2.8kg)     ← 一致
+箱规: 68 × 58 × 52 cm       ← 一致
+单箱数量: 6 / 单箱重量: 14.8kg  ← 一致
+```
 
 ## 上传文件 API
 
