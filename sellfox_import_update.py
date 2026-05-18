@@ -157,11 +157,11 @@ def verify_sku(page, sku):
     print(f"  [OK] '{sku}' found ({total} results)")
 
     # 3. 点 SKU 链接打开详情弹窗
-    page.get_by_text(sku).first.click()
+    page.locator(f'span:has-text("{sku}")').first.click()
     page.wait_for_timeout(2000)
 
     # 4. 点规格信息 tab
-    page.get_by_role('tab', { 'name': '规格信息' }).click()
+    page.get_by_role('tab', name='规格信息').click()
     page.wait_for_timeout(1000)
 
     # 5. 从弹窗文本提取规格数据
@@ -170,10 +170,24 @@ def verify_sku(page, sku):
         .filter(d => d.getBoundingClientRect().width > 200);
         return dialogs[0]?.innerText || ''; })()
     """)
-    print(f"  [Spec Data]:")
-    for line in [l.strip() for l in spec_text.split('\n') if l.strip()]:
-        if any(kw in line for kw in ['cm','kg','g','PCS','规格','重量','数量','箱']):
-            print(f"    {line}")
+    import re
+    patterns = {
+        'spec_l': r'商品规格\s*\n\s*(\d+)\s*\*',
+        'spec_w': r'商品规格\s*\n\s*\d+\s*\*\s*(\d+)\s*\*',
+        'spec_h': r'商品规格\s*\n\s*\d+\s*\*\s*\d+\s*\*\s*(\d+)\s*cm',
+        'weight_g': r'商品重量\s*\n\s*([\d.]+)g',
+        'weight_kg': r'商品重量[\s\S]*?\n\s*([\d.]+)kg',
+    }
+    result = {}
+    for key, pat in patterns.items():
+        m = re.search(pat, spec_text)
+        result[key] = m.group(1) if m else 'N/A'
+
+    print(f"    spec: {result.get('spec_l')}x{result.get('spec_w')}x{result.get('spec_h')} cm")
+    print(f"    weight: {result.get('weight_g')}g = {result.get('weight_kg')}kg")
+    ok = (result.get('spec_l')=='62' and result.get('spec_w')=='52'
+      and result.get('spec_h')=='47' and result.get('weight_kg')=='2.8')
+    print(f"  => {'ALL MATCH' if ok else 'MISMATCH'}")
 
     return True
 
