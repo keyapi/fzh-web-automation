@@ -170,13 +170,26 @@ with open("商品导入模板.xlsx", "wb") as f:
 - **Content-Type**: `multipart/form-data`
 - **Header**: `sf-vvv-i` (CSRF token, 从页面提取) + `sf-vvv-t` (时间戳)
 - **Response**: `{"code":0, "msg":"", "data":"task_batch_id"}`
-- **关键发现**：导入是**异步的**！API 立即返回 200 + task ID，但前端弹窗会显示"正在导入..."并等待 WebSocket 推送（events.sellfox.com）完成通知。弹窗可能卡住 30 秒+。
-- **Python 自动化策略**：调 API → 得 task ID → 关闭弹窗 → 用 `pageList.json` 搜索 SKU 验证导入结果。不需要等弹窗状态变化。
+- **关键发现**：导入是**异步的**！API 立即返回 200 + task ID，但前端弹窗显示"正在导入..."等待 WebSocket 推送
+- **Python 自动化策略**：调 API → 关弹窗 → 搜索验证。不需要等弹窗状态。
+
+### 踩坑：导入 API 200 但数据未更新（闭环验证失败）
+- **现象**：POST /excel/import.json 返回 200 + task ID，但搜索 SKU 发现数据没变
+- **排查中**：可能的根因：
+  1. Excel 列名（中文表头）映射到 API 字段 key 的方式待确认
+  2. 勾选的"规格信息"字段与 Excel 列名不匹配
+  3. 导入可能是异步批处理（延迟数分钟）
+- **待验证**：直接用 commodity 更新 API 写字段 vs 走导入流程
+
+### 踩坑：MCP 浏览器文件选择器不弹出
+- **现象**：手动点击"添加文件"在 MCP 浏览器中无反应
+- **原因**：MCP 浏览器启用沙箱/安全策略拦截了原生文件对话框
+- **解决**：用 Playwright 的 `fileChooser.setFiles()` API 绕过原生对话框
 
 ### 踩坑：导入卡在"正在导入…"
 - **现象**：弹窗显示"状态:正在导入..."几分钟不变
-- **原因**：前端等待 events.sellfox.com 推送完成通知，但 WebSocket 可能断连或延迟
-- **解决**：API 已经返回 200 成功，直接关弹窗。后台异步处理完成即可
+- **原因**：前端等待 events.sellfox.com 推送完成通知，WebSocket 可能断连
+- **解决**：API 已返回 200 成功，直接关弹窗。后台异步处理完成即可
 
 ### 踩坑：el-dialog__wrapper 定位
 - 赛狐页面有 **26 个隐藏的 el-dialog__wrapper**，只有 1 个 visible
