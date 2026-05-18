@@ -145,6 +145,7 @@ context = p.chromium.launch_persistent_context(
 
 ## 参考
 
-- [库存明细页 DOM 知识](references/warehouse-detailed.md) — 所有选择器、行为、踩坑
-- [Python 代码片段](references/code-snippets.md) — 每个 MCP 选择器的 Python Playwright 等价代码
+- [库存明细页](references/warehouse-detailed.md) — 所有选择器、行为、踩坑
+- [商品导入](references/commodity-import.md) — 导入更新商品弹窗、checkbox、下载模板 API
+- [Python 代码片段](references/code-snippets.md) — MCP 选择器→Python Playwright 代码
 - [项目主脚本](../sellfox_auto_export.py) — 浏览器+API 双模式完整实现
