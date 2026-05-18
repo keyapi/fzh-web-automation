@@ -332,7 +332,39 @@ with open("WarehouseItem.xlsx", "wb") as f:
 
 ---
 
-## 8. 通用踩坑速查
+## 8. 文件上传（导入）
+
+```python
+import requests
+from pathlib import Path
+
+def upload_import_file(cookies, file_path, extra_fields=None):
+    """
+    上传 Excel 到赛狐导入接口
+    API: POST /excel/import.json (multipart/form-data)
+    """
+    url = "https://www.sellfox.com/excel/import.json"
+    
+    with open(file_path, "rb") as f:
+        files = {"file": (Path(file_path).name, f, 
+                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+        data = {}
+        if extra_fields:
+            data.update(extra_fields)
+        
+        r = requests.post(url, files=files, data=data, cookies=cookies)
+    
+    result = r.json()
+    if result.get("code") == 0:
+        task_id = result.get("data")
+        print(f"导入成功! task_id={task_id}")
+        return task_id
+    else:
+        print(f"导入失败: {result}")
+        return None
+```
+
+## 9. 通用踩坑速查
 
 | 问题 | 原因 | 解决方案 |
 |------|------|----------|
@@ -343,3 +375,5 @@ with open("WarehouseItem.xlsx", "wb") as f:
 | 登录后停在 dashboard 不跳转 | Sellfox 默认跳 dashboard 而非仓库页 | `wait_for_login` 后手动 `page.goto(PAGE_URL)` |
 | 隐藏0数据每次重置 | 赛狐不持久化此设置 | 每次导出前检查并切换 |
 | export API 返回 data:null | 任务 ID 不在此返回 | 轮询 pageList.json 获取 |
+| **dialog 不可见 (title 为空)** | 赛狐页面 20+ 隐藏 el-dialog__wrapper | 必须 `.filter(d => d.getBoundingClientRect().width > 0)` |
+| **el-checkbox evaluate click 无效** | Vue 组件需真实鼠标事件 | 必须用 Playwright `.click()` 不能 evaluate |

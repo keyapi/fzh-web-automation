@@ -25,6 +25,8 @@ metadata:
 - 页面是 SPA，**永远**导航后等 5-8 秒再操作（等 Vue 渲染）
 - **永远**先读 `references/` 下对应的页面文件，再操作该页面
 - **永远**不在 SKILL.md 里硬编码密码或 token
+- **永远**定位 dialog 时过滤 visible：赛狐页面有 20+ 个隐藏的 `.el-dialog__wrapper`
+  必须 `[...wrappers].filter(w=>w.getBoundingClientRect().width>0)`
 
 ## When NOT to Use
 
