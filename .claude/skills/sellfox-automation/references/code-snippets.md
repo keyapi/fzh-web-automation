@@ -89,7 +89,41 @@ page.wait_for_timeout(500)
 
 ## 3. 搜索操作
 
-### 读取当前搜索类型和模式
+### 商品列表页搜索 SKU（已验证 ✅）
+
+```python
+# 商品列表页的搜索和库存页不同 — placeholder 是"搜索内容"
+# 用 getByPlaceholder 而非 input[placeholder=...]（两个同名元素）
+search = page.get_by_placeholder('搜索内容').first
+search.click()
+search.fill('')
+search.fill(sku)           # 如 'test001-white'
+page.keyboard.press('Enter')  # Enter 触发 Vue 搜索
+page.wait_for_timeout(3000)
+
+# 读结果数
+total = page.evaluate(
+    "() => { const p = document.querySelector('.el-pagination');"
+    " return p?.textContent?.match(/共\\s*(\\d+)\\s*条/)?.[1] || '0'; }"
+)
+print(f"Found {total} results")
+
+# API 补充: 拿 commodity id (pageList 不返规格字段)
+item_id = page.evaluate(f"""
+  async () => {{
+    const r = await fetch('/api/commodity/pageList.json', {{
+      method:'POST', headers:{{'content-type':'application/json'}},
+      body:JSON.stringify({{ searchType:"exact", searchField:"commoditySku",
+        searchValue:"{sku}", pageNo:1, pageSize:1, tableType:"1", isHidden:false }})
+    }});
+    return (await r.json())?.data?.rows?.[0]?.id;
+  }}
+""")
+```
+
+**注意**: pageList.json 返回 84 字段但规格项 (length/cartonRule/cartonWeight) 为 0/null
+
+### 读取搜索类型和模式（库存明细页）
 ```python
 # 搜索类型: SKU / 品名 / 识别码 / 型号 / FNSKU / SPU / 款名 / MSKU
 search_type = page.evaluate("""

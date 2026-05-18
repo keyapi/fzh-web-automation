@@ -154,9 +154,33 @@ with open("商品导入模板.xlsx", "wb") as f:
 | 按钮 | 功能 |
 |------|------|
 | 关闭 | 关闭弹窗 |
-| 导入 | 执行导入（需先上传文件） |
+| 导入 | 执行导入（需先上传文件，先选字段→再上传→最后点导入） |
 | 添加文件 | 选择要导入的 Excel 文件（.el-button--primary） |
 | 下载商品模板 | 下载当前勾选字段的 Excel 模板 |
+
+## 搜索验证（SKU 是否存在）
+
+**商品列表页搜索** (已验证 ✅):
+```python
+search = page.get_by_placeholder('搜索内容').first  # 不用 input[placeholder=...]
+search.click()
+search.fill('')
+search.fill(sku)
+page.keyboard.press('Enter')       # Enter 触发 Vue 搜索
+page.wait_for_timeout(3000)
+# 读结果: .el-pagination 中 "共 X 条"
+```
+
+**API 验证** (已验证 ✅):
+```python
+r = fetch('/api/commodity/pageList.json', {
+  searchType:"exact", searchField:"commoditySku", searchValue:sku
+})
+# → item.id, item.commodityName 等84字段
+# 但 pageList 不返回规格详情(length/cartonRule/cartonWeight等为0)
+```
+
+**商品详情（规格字段）**: pageList.json 不返回规格字段。需通过详情页或详情API获取。
 
 ## 上传文件 API
 
