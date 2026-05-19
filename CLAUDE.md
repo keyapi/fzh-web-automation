@@ -205,6 +205,15 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - **现象**：Playwright click 超时 (element not visible)
 - **解决**：使用 `page.evaluate("item.click()")` 绕过可见性检查
 
+### 坑 13：无 MCP 探索直接猜 URL 浪费大量精力（教训！）
+- **现象**：找"其他入库"入口时，在 Python Playwright 脚本中穷举了 20+ 个猜测 URL，
+  反复试错耗时数十分钟，结果入口其实在侧边栏展开菜单中（一个 `<a>` 标签点击即可）
+- **根因**：Sellfox 的 SPA 侧边栏菜单只在点击"仓库"导航后动态展开，
+  菜单项是 `<a>` 标签直接点击触发 Vue Router 导航，URL 无法直接访问
+- **正确做法**：先用 MCP Playwright 浏览器浏览页面→截图→evaluate 搜 DOM→点菜单找 URL，
+  确认后只用 Python 写脚本。不要凭猜测凑 URL
+- **教训级别**：🔴 严重 —— 10 分钟 MCP 探索可省 2+ 小时 Python 试错
+
 ## 通途页面 DOM 知识
 
 ### 仓库选择器（非标准 `<select>`）
