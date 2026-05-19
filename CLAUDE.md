@@ -250,27 +250,71 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 
 ---
 
-## Skill 管理规则
+## Skill 管理规则（2026 最佳实践）
 
-### 目录结构
-遵循 [agentskills.io](https://agentskills.io) 规范：
+### 核心原则
+1. **每个平台/模块一个 skill**，职责单一，不堆砌
+2. **SKILL.md 是入口索引**（<300 行），不做百科
+3. **references/ 放详情**（页面结构、选择器、代码），按需加载
+4. **description 是触发命中的关键**——必须包含用户真正会说的自然语言
+5. **所有 skill 文件纳入 git**，可回滚、可协作
+
+### 目录规范
 ```
-.claude/skills/<skill-name>/
-├── SKILL.md              # 入口：YAML frontmatter + Markdown 正文
-└── references/           # 按需加载的参考资料（保持一层深度）
+.claude/skills/<kebab-case-name>/          # 小写中划线
+├── SKILL.md                               # 入口：YAML frontmatter + 正文
+├── references/                            # 渐进加载的参考文件（一层深度）
+│   ├── page-detail.md                     # 页面 DOM + 选择器 + 操作流程
+│   ├── code-snippets.md                   # Python 代码片段
+│   └── ...                                # 每个页面/模块一个文件
+└── scripts/                               # (可选) 独立脚本
 ```
 
-### 命名规则
-- 小写 kebab-case：`sellfox-automation`、`warehouse-detailed`
-- 一个 skill 一个职责，多页面用 references/ 拆分
+### YAML Frontmatter 模板
+
+```yaml
+---
+name: platform-automation
+description: >
+  一句话描述 skill 用途。包含所有用户可能使用的触发词。
+  "当用户提到 XXX、YYY、ZZZ 等时触发。"
+  这行是 Claude 自动检测是否激活 skill 的唯一依据，务必覆盖完整！
+compatibility: >
+  依赖说明：需要什么环境、工具、配置文件。
+metadata:
+  platform: 平台名 (技术栈)
+  python_script: 主脚本文件名
+  profile_dir: 登录配置目录
+  updated: 2026-05-19
+---
+```
+
+**description 编写规则**：
+- 包含用户真正会说出口的词：产品名、动词、功能名
+- 中英文都要覆盖（如 "通途"+"Tongtu"+"库存结存"+"export"）
+- 用自然语言短语而非关键词堆砌
+- 明确 NOT 情况：什么情况下**不要**触发
 
 ### 编写原则
-1. **SKILL.md 是索引**（<500 行），不堆砌细节
-2. **references/ 放详情**，每页一个 reference 文件
-3. **每个 reference 记录**：URL、页面结构、选择器、操作流程、已知未知、踩坑
-4. **渐进披露**：metadata 常驻（~100 tokens）→ SKILL.md 按需加载 → references 更深按需
-5. **每次 MCP 探索后立即更新** reference 文件，不积累记忆负担
-6. **中文描述 + 英文选择器**：面向中文用户但代码级内容保持原样
+
+| 原则 | 说明 |
+|------|------|
+| **SKILL.md < 300 行** | 只保留触发条件、约束、操作流程索引、Quality Checklist |
+| **references/ 放细节** | 每个页面/主题一个文件，结构：URL→页面结构→选择器→流程→踩坑 |
+| **中文 + 英文选择器** | 面向中文用户描述，代码级内容保持原样 |
+| **"给同事"版块** | 每个 SKILL.md 开头放"一句话触发"表格，非技术同事只看这个 |
+| **去重** | SKILL.md 不重复 CLAUDE.md 已有内容，用引用代替 |
+
+### 触发词覆盖规则
+description 中必须覆盖以下类型的触发词：
+
+| 类型 | 示例 |
+|------|------|
+| 平台名中英文 | 通途/Tongtu/tongtool, 赛狐/Sellfox/sellfox.com |
+| 核心动词 | 导出/导入/搜索/切换/合并/下载/上传 |
+| 关键页面名 | 库存明细/库存结存/商品列表/仓库导出 |
+| 特征元素 | togglebutton/el-select/el-dialog/图标导出 |
+| 用户习惯说法 | 6个仓库/CENTRADE/头程运费/隐藏0数据 |
 
 ### 新页面探索流程（铁律）
 **任何新页面或新功能，必须按此顺序**：
@@ -284,7 +328,7 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 ### 闭环测试（铁律）
 **任何自动化脚本写完后，必须自己跑一遍闭环验证**：
 1. 执行操作（导出/导入/搜索）
-2. 读取结果（下载文件/API查询）
+2. 读取结果（下载文件/API查询/弹窗文本）
 3. 验证数据是否正确更新
 4. **不验证 = 代码不可靠**
 5. 验证失败要追根因，不"差不多得了"
@@ -307,11 +351,18 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - **及时合并到 main**，避免分支长期分离
 - **保持工作区干净**：提交前检查 `git status`，不留临时文件
 
-### 探索工作流（新页面通用流程）
-1. `browser_navigate` 到目标 URL
-2. 检测登录状态（URL 是否被重定向）
-3. `browser_snapshot` → 太大用 `browser_evaluate` 精准提取
-4. 搜索关键元素：过滤框 (input placeholder)、按钮 (icon class)、表格
-5. 点击关键元素观察行为（弹窗、下载、页面跳转）
-6. **立即记录到 references/**，不等全部探索完
-7. 标记"已知未知"：哪些已验证、哪些待验证
+### 给非技术同事的用法指南
+
+技能迁移完成后，同事只需在 Claude Code 中自然语言说出需求：
+
+| 你想做什么 | 就说这句话 |
+|-----------|-----------|
+| 通途导出全部仓库 | "**通途导出库存**" |
+| 通途导指定仓库 | "**通途导出 CENTRADE 仓库**" |
+| 通途重新登录 | "**通途重新登录**" |
+| 赛狐导出库存 | "**赛狐导出库存**" |
+| 赛狐搜索商品 | "**赛狐搜索 SKU KS0001**" |
+| 赛狐导入更新商品 | "**赛狐导入更新商品**" |
+| 查看所有 skill | "**/skill**" |
+
+> 首次运行两个平台都需要手动登录一次（浏览器弹窗），之后免登录。

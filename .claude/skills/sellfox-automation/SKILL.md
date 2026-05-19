@@ -5,7 +5,7 @@ description: >
   当用户提到"赛狐"、"Sellfox"、"sellfox.com"、"库存明细"、"仓库导出"、
   "sku搜索"、"品名搜索"、"精确/模糊搜索"、"隐藏0数据"、"分页"等时触发。
   配合 references/code-snippets.md 可直接生成 Python Playwright 代码。
-  不要用于通途 (Tongtu) — 那是另一个独立系统 (见 SKILL_tongtu_automation.md)。
+  不要用于通途 (Tongtu) — 那是另一个独立系统 (见 `/skill tongtu-automation`)。
 compatibility: >
   需要 Playwright MCP 或 Python Playwright (sync_api)。推荐配合
   SKILL_web_automation.md（通用选择器模式）、references/code-snippets.md（代码模板）。
@@ -30,7 +30,7 @@ metadata:
 
 ## When NOT to Use
 
-- 通途 (Tongtu) ERP 操作 → 用项目根目录的 `SKILL_tongtu_automation.md`
+- 通途 (Tongtu) ERP 操作 → 通途 skill (`/skill tongtu-automation`)
 - 非赛狐网站的一般浏览器自动化 → 用 `SKILL_web_automation.md`
 - 纯数据分析（已有 Excel 文件） → 直接用 pandas/Python 脚本
 
