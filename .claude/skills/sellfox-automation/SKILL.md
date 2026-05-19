@@ -27,6 +27,9 @@ metadata:
 - **永远**不在 SKILL.md 里硬编码密码或 token
 - **永远**定位 dialog 时过滤 visible：赛狐页面有 20+ 个隐藏的 `.el-dialog__wrapper`
   必须 `[...wrappers].filter(w=>w.getBoundingClientRect().width>0)`
+- **库存修改铁律**：凡是涉及到库存数量或成本修改的操作（其他入库/其他出库等），
+  **必须**先下载库存明细备份文件（`sellfox_auto_export.py`），修改后再导出一次用于对照验证。
+  这是财务核算需要，不可跳过。
 
 ## When NOT to Use
 
