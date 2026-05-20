@@ -1,6 +1,52 @@
-# CLAUDE.md — 通途库存自动化项目
+# CLAUDE.md — 跨境电商 ERP 自动化项目
 
-## 业务背景
+## 公司背景 (FZH)
+
+**FZH** 是跨境电商公司，在北美和欧洲销售**家居纺织品**（填充物为 PP棉/海绵的靠枕、沙发等）。
+销售平台：Amazon（北美+欧洲）、Wayfair、Home24、Shopify 等。
+
+### 供应链架构
+
+```
+绍兴工厂 (中国)
+  ├─ 生产皮壳、内胆、半成品（如缝制海绵进皮壳）
+  ├─ 部分成品直接生产（填充+压缩+包装）→ FBA / 直接发货
+  │
+  └─ → 海外分公司仓库：
+       ├── USNJ (美东, NJ州) → 填充/压缩/包装/仓储/发货(2C+个别2B)
+       ├── USTX (美中, TX州) → 同上
+       └── POLAND (波兰)     → 同上
+            │
+            └─ → Amazon FBA / 第三方海外仓
+```
+
+海外分公司负责：填充、抽真空压缩、包装、仓储、发货（主要是 2C，个别 2B）。
+
+### 赛狐仓库映射
+
+| 公司仓库 | 赛狐仓库名 | 说明 |
+|----------|-----------|------|
+| USNJ 美东仓 | CENTRADE | 已启用 |
+| USTX 美中仓 | DANEEY | 已启用 |
+| POLAND 波兰仓 | POLAND | 已启用 |
+| 绍兴工厂(本地) | — | 未启用（赛狐本地仓限制多） |
+
+> 赛狐有两种仓库类型：**本地仓**（中国仓，更多限制，未启用）和**海外仓**（我们用的 3 个分公司仓）。
+> 赛狐本身主要服务小卖家（中国直发），我们的架构不同，需要"套进"赛狐体系使用。
+
+### 财务核算需求
+
+可能经常需要调整库存成本（类似 ERPNext 的库存调账）：
+- 原材料价格变化
+- 头程价格变化
+- 之前维护的数据不对
+
+**赛狐限制**：海外仓不能直接通过库存调账修改库存数量和采购单价。
+需要通过 **其他入库 / 其他出库** 的方式实现成本调整。
+
+---
+
+## 通途项目背景
 
 **通途 (Tongtu)** 是跨境电商 ERP 系统（erp102.tongtool.com），管理亚马逊/eBay/速卖通等平台订单、采购、仓储、财务。
 
@@ -159,6 +205,15 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - **现象**：Playwright click 超时 (element not visible)
 - **解决**：使用 `page.evaluate("item.click()")` 绕过可见性检查
 
+### 坑 13：无 MCP 探索直接猜 URL 浪费大量精力（教训！）
+- **现象**：找"其他入库"入口时，在 Python Playwright 脚本中穷举了 20+ 个猜测 URL，
+  反复试错耗时数十分钟，结果入口其实在侧边栏展开菜单中（一个 `<a>` 标签点击即可）
+- **根因**：Sellfox 的 SPA 侧边栏菜单只在点击"仓库"导航后动态展开，
+  菜单项是 `<a>` 标签直接点击触发 Vue Router 导航，URL 无法直接访问
+- **正确做法**：先用 MCP Playwright 浏览器浏览页面→截图→evaluate 搜 DOM→点菜单找 URL，
+  确认后只用 Python 写脚本。不要凭猜测凑 URL
+- **教训级别**：🔴 严重 —— 10 分钟 MCP 探索可省 2+ 小时 Python 试错
+
 ## 通途页面 DOM 知识
 
 ### 仓库选择器（非标准 `<select>`）
@@ -250,27 +305,71 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 
 ---
 
-## Skill 管理规则
+## Skill 管理规则（2026 最佳实践）
 
-### 目录结构
-遵循 [agentskills.io](https://agentskills.io) 规范：
+### 核心原则
+1. **每个平台/模块一个 skill**，职责单一，不堆砌
+2. **SKILL.md 是入口索引**（<300 行），不做百科
+3. **references/ 放详情**（页面结构、选择器、代码），按需加载
+4. **description 是触发命中的关键**——必须包含用户真正会说的自然语言
+5. **所有 skill 文件纳入 git**，可回滚、可协作
+
+### 目录规范
 ```
-.claude/skills/<skill-name>/
-├── SKILL.md              # 入口：YAML frontmatter + Markdown 正文
-└── references/           # 按需加载的参考资料（保持一层深度）
+.claude/skills/<kebab-case-name>/          # 小写中划线
+├── SKILL.md                               # 入口：YAML frontmatter + 正文
+├── references/                            # 渐进加载的参考文件（一层深度）
+│   ├── page-detail.md                     # 页面 DOM + 选择器 + 操作流程
+│   ├── code-snippets.md                   # Python 代码片段
+│   └── ...                                # 每个页面/模块一个文件
+└── scripts/                               # (可选) 独立脚本
 ```
 
-### 命名规则
-- 小写 kebab-case：`sellfox-automation`、`warehouse-detailed`
-- 一个 skill 一个职责，多页面用 references/ 拆分
+### YAML Frontmatter 模板
+
+```yaml
+---
+name: platform-automation
+description: >
+  一句话描述 skill 用途。包含所有用户可能使用的触发词。
+  "当用户提到 XXX、YYY、ZZZ 等时触发。"
+  这行是 Claude 自动检测是否激活 skill 的唯一依据，务必覆盖完整！
+compatibility: >
+  依赖说明：需要什么环境、工具、配置文件。
+metadata:
+  platform: 平台名 (技术栈)
+  python_script: 主脚本文件名
+  profile_dir: 登录配置目录
+  updated: 2026-05-19
+---
+```
+
+**description 编写规则**：
+- 包含用户真正会说出口的词：产品名、动词、功能名
+- 中英文都要覆盖（如 "通途"+"Tongtu"+"库存结存"+"export"）
+- 用自然语言短语而非关键词堆砌
+- 明确 NOT 情况：什么情况下**不要**触发
 
 ### 编写原则
-1. **SKILL.md 是索引**（<500 行），不堆砌细节
-2. **references/ 放详情**，每页一个 reference 文件
-3. **每个 reference 记录**：URL、页面结构、选择器、操作流程、已知未知、踩坑
-4. **渐进披露**：metadata 常驻（~100 tokens）→ SKILL.md 按需加载 → references 更深按需
-5. **每次 MCP 探索后立即更新** reference 文件，不积累记忆负担
-6. **中文描述 + 英文选择器**：面向中文用户但代码级内容保持原样
+
+| 原则 | 说明 |
+|------|------|
+| **SKILL.md < 300 行** | 只保留触发条件、约束、操作流程索引、Quality Checklist |
+| **references/ 放细节** | 每个页面/主题一个文件，结构：URL→页面结构→选择器→流程→踩坑 |
+| **中文 + 英文选择器** | 面向中文用户描述，代码级内容保持原样 |
+| **"给同事"版块** | 每个 SKILL.md 开头放"一句话触发"表格，非技术同事只看这个 |
+| **去重** | SKILL.md 不重复 CLAUDE.md 已有内容，用引用代替 |
+
+### 触发词覆盖规则
+description 中必须覆盖以下类型的触发词：
+
+| 类型 | 示例 |
+|------|------|
+| 平台名中英文 | 通途/Tongtu/tongtool, 赛狐/Sellfox/sellfox.com |
+| 核心动词 | 导出/导入/搜索/切换/合并/下载/上传 |
+| 关键页面名 | 库存明细/库存结存/商品列表/仓库导出 |
+| 特征元素 | togglebutton/el-select/el-dialog/图标导出 |
+| 用户习惯说法 | 6个仓库/CENTRADE/头程运费/隐藏0数据 |
 
 ### 新页面探索流程（铁律）
 **任何新页面或新功能，必须按此顺序**：
@@ -284,7 +383,7 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 ### 闭环测试（铁律）
 **任何自动化脚本写完后，必须自己跑一遍闭环验证**：
 1. 执行操作（导出/导入/搜索）
-2. 读取结果（下载文件/API查询）
+2. 读取结果（下载文件/API查询/弹窗文本）
 3. 验证数据是否正确更新
 4. **不验证 = 代码不可靠**
 5. 验证失败要追根因，不"差不多得了"
@@ -307,11 +406,50 @@ MCP Playwright 使用独立浏览器实例，无法共享 chrome-profile。解�
 - **及时合并到 main**，避免分支长期分离
 - **保持工作区干净**：提交前检查 `git status`，不留临时文件
 
-### 探索工作流（新页面通用流程）
-1. `browser_navigate` 到目标 URL
-2. 检测登录状态（URL 是否被重定向）
-3. `browser_snapshot` → 太大用 `browser_evaluate` 精准提取
-4. 搜索关键元素：过滤框 (input placeholder)、按钮 (icon class)、表格
-5. 点击关键元素观察行为（弹窗、下载、页面跳转）
-6. **立即记录到 references/**，不等全部探索完
-7. 标记"已知未知"：哪些已验证、哪些待验证
+### 给非技术同事的用法指南
+
+技能迁移完成后，同事只需在 Claude Code 中自然语言说出需求：
+
+| 你想做什么 | 就说这句话 |
+|-----------|-----------|
+| 通途导出全部仓库 | "**通途导出库存**" |
+| 通途导指定仓库 | "**通途导出 CENTRADE 仓库**" |
+| 通途重新登录 | "**通途重新登录**" |
+| 赛狐导出库存 | "**赛狐导出库存**" |
+| 赛狐搜索商品 | "**赛狐搜索 SKU KS0001**" |
+| 赛狐导入更新商品 | "**赛狐导入更新商品**" |
+| 查看所有 skill | "**/skill**" |
+
+> 首次运行两个平台都需要手动登录一次（浏览器弹窗），之后免登录。
+
+---
+
+## Hooks 钩子学习记录（2026-05-20）
+
+### 结论：当前项目不需要也不使用 Hooks
+
+#### 知识来源
+1. 官方 Blog: [How Claude Code works in large codebases](https://claude.com/blog/how-claude-code-works-in-large-codebases-best-practices-and-where-to-start) — 阐释 Harness 架构（CLAUDE.md → Hooks → Skills → Plugins → MCP）
+2. 社区教程/案例（CSDN、dev.to、GitHub Issues）
+
+#### Hooks 核心知识
+
+| 生命周期事件 | 作用 | 我们适用？ |
+|-------------|------|-----------|
+| `SessionStart` | 注入动态上下文（git 分支等） | ❌ GUI/Desktop 不支持 (Bug #16763) |
+| `PreToolUse` | 拦截危险命令（exit 2 阻止） | ❌ 无强拦截需求 |
+| `PostToolUse` | 自动格式化、lint | ❌ 不做 Web 开发 |
+| `UserPromptSubmit` | 每次提示前预处理 | ❌ 频率太高，过度设计 |
+| `Stop` | 会话结束反思总结 | ❌ 不需要 |
+
+#### 实测结论
+
+1. **Claude Desktop 3P 安装版不支持 SessionStart hooks**（官方已知 Bug [#16763](https://github.com/anthropics/claude-code/issues/16763)）——只对 CLI 启动的 session 有效，GUI pane 不触发
+2. **Plugin 中的 SessionStart hook 也有问题**（官方 Bug [#16538](https://github.com/anthropics/claude-code/issues/16538)）——`additionalContext` 不会被传递给 Claude
+
+#### 设计原则
+
+- Hooks 适合**企业团队场景**（强制代码规范、审查流程）和**确定性拦截**（PreToolUse 拦截 `rm -rf` / `git push --force`）
+- 个人项目如果只是"想让 Claude 知道些信息"，用 CLAUDE.md + SKILL.md 就够，不需要 Hook
+- `git status` 这类即时查询，让 Claude 现场跑一下就行（1 秒完成），不需要 Hook 预注入
+- **过度设计比不做更糟糕**——别为了用一个技术而去用它
