@@ -2,12 +2,12 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "python .claude/hooks/session-start.py",
-            "timeout": 10
+            "command": "echo \"[Hook OK] session started at $(date)\"",
+            "timeout": 5
           }
         ]
       }
