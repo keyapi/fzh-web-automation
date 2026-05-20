@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 -c \"import json,sys,subprocess,os; d=json.load(sys.stdin).get('cwd','.'); os.chdir(d); b=subprocess.run(['git','branch','--show-current'],capture_output=True,text=True).stdout.strip() or 'N/A'; s=subprocess.run(['git','status','--porcelain'],capture_output=True,text=True).stdout; c=len([l for l in s.split(chr(10)) if l.strip()]); l=subprocess.run(['git','log','--oneline','-1'],capture_output=True,text=True).stdout.strip()[:80] or 'N/A'; t=subprocess.run(['git','log','-1','--format=%cr'],capture_output=True,text=True).stdout.strip() or 'N/A'; print(json.dumps({'continue':True,'hookSpecificOutput':{'additionalContext':f'[SessionStart] 分支:{b} | 未提交:{c}文件 | 最近:{l} ({t})'}}).replace(chr(10),' '))\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
