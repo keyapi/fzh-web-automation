@@ -48,13 +48,29 @@ def wait_for_login(page):
 
 
 def is_logged_in(page):
+    """检测是否已登录 — 看页面是否有「添加单据」按钮。"""
     url = page.url
-    if "login" in url:
+    if "login" in url or url == "about:blank":
         return False
     try:
-        return page.locator(".icon_sf_download").first.is_visible() or "login" not in url
+        return page.locator("button:has-text(\"添加单据\")").first.is_visible(timeout=3000)
     except:
-        return "login" not in url
+        return False
+
+
+def _click_by_text(page, text: str, container_sel: str = "button"):
+    """用 JS evaluate 点击匹配文字的按钮，绕过 Playwright has_text 的编码问题。"""
+    escaped = text.replace("'", "\\'")
+    page.evaluate(f"""
+        (() => {{
+            for (const el of document.querySelectorAll('{container_sel}')) {{
+                if (el.textContent && el.textContent.includes('{escaped}')) {{
+                    el.click();
+                    return;
+                }}
+            }}
+        }})()
+    """)
 
 
 def import_one_file(page, filepath: Path) -> dict:
@@ -64,36 +80,38 @@ def import_one_file(page, filepath: Path) -> dict:
     print(f"{'='*50}")
 
     page.goto(PAGE_URL, timeout=30000)
-    page.wait_for_timeout(3000)
+    page.wait_for_timeout(5000)
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    page.wait_for_timeout(500)
+
+    # 关闭可能的公告弹窗
+    page.evaluate("""
+        document.querySelectorAll('.el-dialog__headerbtn, [class*="close"]').forEach(b => {
+            if (b.offsetParent !== null) b.click();
+        });
+    """)
+    page.wait_for_timeout(500)
 
     # Step 1: 点击"添加单据"
     print("  添加单据...")
-    add_btn = page.locator('button', has_text="添加单据").first
-    add_btn.wait_for(state="visible", timeout=10000)
-    add_btn.click()
-    page.wait_for_timeout(600)
+    _click_by_text(page, "添加单据", "button")
+    page.wait_for_timeout(800)
 
     # Step 2: 点击"导入海外仓备货单"
     print("  导入海外仓备货单...")
-    try:
-        import_item = page.locator('.el-dropdown-menu__item', has_text="导入海外仓备货单").first
-        import_item.click(timeout=3000)
-    except:
-        page.evaluate("""
-            document.querySelectorAll('.el-dropdown-menu__item').forEach(item => {
-                if (item.textContent.includes('导入海外仓备货单')) item.click();
-            });
-        """)
+    page.evaluate("""
+        document.querySelectorAll('.el-dropdown-menu__item').forEach(item => {
+            if (item.textContent && item.textContent.includes('导入海外仓备货单')) item.click();
+        });
+    """)
     page.wait_for_timeout(800)
 
-    # Step 3: 点击"添加文件"
+    # Step 3: 等待弹窗渲染 → 点击"添加文件"
     print("  添加文件...")
-    add_file_btn = page.locator('.el-dialog button', has_text="添加文件").first
-    add_file_btn.wait_for(state="visible", timeout=5000)
+    page.wait_for_timeout(1500)
+    add_file_btn = page.locator(".el-dialog button:has-text(\"添加文件\")").first
+    add_file_btn.wait_for(state="visible", timeout=10000)
     add_file_btn.click()
-    page.wait_for_timeout(500)
 
     # Step 4: 上传文件
     print(f"  上传: {filepath.name}")
@@ -103,9 +121,21 @@ def import_one_file(page, filepath: Path) -> dict:
 
     # Step 5: 点击"导入"
     print("  导入中...")
-    import_btn = page.locator('.el-dialog button', has_text="导入").last
-    import_btn.wait_for(state="visible", timeout=5000)
-    import_btn.click()
+    page.evaluate("""
+        (() => {
+            const wrappers = document.querySelectorAll('.el-dialog__wrapper');
+            for (const d of wrappers) {
+                if (window.getComputedStyle(d).display !== 'none') {
+                    for (const btn of d.querySelectorAll('button')) {
+                        if (btn.textContent.trim() === '导入' && !btn.disabled) {
+                            btn.click();
+                            return;
+                        }
+                    }
+                }
+            }
+        })()
+    """)
 
     # Step 6: 轮询导入结果（赛狐后台处理，500条约需30s）
     result_text = None
@@ -133,30 +163,31 @@ def import_one_file(page, filepath: Path) -> dict:
     error_file = None
     if fail_count > 0:
         print(f"  [!] 成功{success_count}条, 失败{fail_count}条 — 下载错误报告...")
-        try:
-            download_link = page.locator('text=下载查看失败原因').first
-            download_link.click(timeout=3000)
-            page.wait_for_timeout(2000)
-            # Check downloads dir for latest error file
-            downloads = sorted(Path(DEFAULT_IMPORT_DIR).parent.glob(".playwright-mcp/导入失败记录*.xlsx"),
-                              key=lambda f: f.stat().st_mtime)
-            if downloads:
-                error_file = str(downloads[-1])
-        except:
-            pass
+        page.evaluate("""
+            (() => {
+                for (const el of document.querySelectorAll('*')) {
+                    if (el.textContent.trim() === '下载查看失败原因') {
+                        el.click();
+                        return;
+                    }
+                }
+            })()
+        """)
+        page.wait_for_timeout(2000)
+        # Check downloads dir for latest error file
+        downloads = sorted(Path(DEFAULT_IMPORT_DIR).parent.glob(".playwright-mcp/导入失败记录*.xlsx"),
+                          key=lambda f: f.stat().st_mtime)
+        if downloads:
+            error_file = str(downloads[-1])
     else:
         print(f"  [OK] 成功{success_count}条")
 
     # Step 8: 关闭弹窗
-    try:
-        close_btn = page.locator('.el-dialog button', has_text="关闭").first
-        close_btn.click(timeout=3000)
-    except:
-        page.evaluate("""
-            document.querySelectorAll('.el-dialog__wrapper button').forEach(btn => {
-                if (btn.textContent.trim() === '关闭') btn.click();
-            });
-        """)
+    page.evaluate("""
+        document.querySelectorAll('.el-dialog__wrapper button').forEach(btn => {
+            if (btn.textContent.trim() === '关闭') btn.click();
+        });
+    """)
     page.wait_for_timeout(500)
 
     return {
