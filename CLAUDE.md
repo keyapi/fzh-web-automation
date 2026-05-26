@@ -123,6 +123,8 @@
 ├── SKILL_tongtu_automation.md     # Skill: 通途专项自动化
 ├── sellfox_auto_export.py          # 赛狐库存导出（浏览器+API）
 ├── sellfox_import_update.py        # 赛狐商品导入更新（闭环验证）
+├── sellfox_import_other_outbound.py # 赛狐其他出库一键导入
+├── sellfox_import_warehouse_restock.py # 赛狐海外仓备货单一键导入
 ├── commodity_import_template.py    # 赛狐下载商品导入模板
 └── sellfox-profile/                # 赛狐持久化登录 (gitignore)
 ```
