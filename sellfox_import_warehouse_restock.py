@@ -79,43 +79,100 @@ def import_one_file(page, filepath: Path) -> dict:
     print(f"导入: {filepath.name}")
     print(f"{'='*50}")
 
-    page.goto(PAGE_URL, timeout=30000)
+    # 导航到海外仓备货单页面 — SPA 需要先激活仓库模块
+    print("  导航到海外仓备货单页...")
+    # 先通过侧边栏点击"仓库"激活模块
+    page.goto("https://www.sellfox.com/amzup-web-main/web/warehouse/detailed/index.html", timeout=30000)
     page.wait_for_timeout(5000)
     page.keyboard.press("Escape")
     page.wait_for_timeout(500)
 
-    # 关闭可能的公告弹窗
-    page.evaluate("""
-        document.querySelectorAll('.el-dialog__headerbtn, [class*="close"]').forEach(b => {
-            if (b.offsetParent !== null) b.click();
-        });
-    """)
+    # 再导航到海外仓备货单
+    page.goto(PAGE_URL, timeout=30000)
+    page.wait_for_timeout(5000)
+    page.keyboard.press("Escape")
     page.wait_for_timeout(500)
+    url = page.evaluate("() => location.href")
+    print(f"    当前URL: {url[:80]}")
 
-    # Step 1: 点击"添加单据"
-    print("  添加单据...")
-    _click_by_text(page, "添加单据", "button")
+    # 如果还是 dashboard — 再刷一次
+    if "dashboard" in url or "warehouse" not in url:
+        page.goto(PAGE_URL, timeout=30000)
+        page.wait_for_timeout(5000)
+
+    # 关闭公告弹窗 + 等待「添加单据」按钮 → 检测到立即点击
+    print("  等待页面渲染 + 点击添加单据...")
+    for attempt in range(30):
+        time.sleep(1)
+        page.keyboard.press("Escape")
+        result = page.evaluate("""
+            (() => {
+                // Close all announcement dialogs first
+                document.querySelectorAll('.el-dialog__headerbtn, [class*="close_btn"]').forEach(b => {
+                    if (b.offsetParent !== null) b.click();
+                });
+                // Find and click 添加单据
+                for (const el of document.querySelectorAll('button')) {
+                    if ((el.textContent || '').includes('添加单据') && el.offsetParent !== null) {
+                        el.click();
+                        return 'clicked';
+                    }
+                }
+                return 'waiting';
+            })()
+        """)
+        if result == 'clicked':
+            print(f"    已点击添加单据 (第{attempt+1}s)")
+            break
     page.wait_for_timeout(800)
 
     # Step 2: 点击"导入海外仓备货单"
     print("  导入海外仓备货单...")
-    page.evaluate("""
-        document.querySelectorAll('.el-dropdown-menu__item').forEach(item => {
-            if (item.textContent && item.textContent.includes('导入海外仓备货单')) item.click();
-        });
+    page.wait_for_timeout(500)
+    r2 = page.evaluate("""
+        (() => {
+            const items = document.querySelectorAll('.el-dropdown-menu__item');
+            for (const item of items) {
+                if ((item.textContent || '').includes('导入海外仓备货单')) {
+                    item.click();
+                    return 'clicked';
+                }
+            }
+            return 'not found. items count: ' + items.length;
+        })()
     """)
-    page.wait_for_timeout(800)
-
-    # Step 3: 等待弹窗渲染 → 点击"添加文件"
-    print("  添加文件...")
+    print(f"    => {r2}")
     page.wait_for_timeout(1500)
-    add_file_btn = page.locator(".el-dialog button:has-text(\"添加文件\")").first
-    add_file_btn.wait_for(state="visible", timeout=10000)
-    add_file_btn.click()
+
+    # Step 3: 确认弹窗打开 + 用原生 click 触发 file chooser
+    print("  添加文件...")
+    dialog_ok = page.evaluate("""
+        (() => {
+            const wrappers = document.querySelectorAll('.el-dialog__wrapper');
+            for (const d of wrappers) {
+                if (window.getComputedStyle(d).display !== 'none') {
+                    const btns = d.querySelectorAll('button');
+                    for (const btn of btns) {
+                        if ((btn.textContent || '').includes('添加文件')) return true;
+                    }
+                    return 'button not in dialog: ' + [...btns].map(b => b.textContent.trim()).filter(Boolean).slice(0,5).join(', ');
+                }
+            }
+            return 'no dialog';
+        })()
+    """)
+    if dialog_ok is not True:
+        raise Exception(f"弹窗异常: {dialog_ok}")
+    # 必须用 Playwright 原生 click 触发文件选择器
+    # 先注册 file chooser 监听，再点击
+    add_file = page.locator("button").filter(has_text="添加文件").first
+    with page.expect_file_chooser(timeout=10000) as fc_info:
+        add_file.click(timeout=5000)
+    file_chooser = fc_info.value
+    page.wait_for_timeout(500)
 
     # Step 4: 上传文件
     print(f"  上传: {filepath.name}")
-    file_chooser = page.wait_for_event("filechooser", timeout=10000)
     file_chooser.set_files(str(filepath))
     page.wait_for_timeout(1000)
 
@@ -137,21 +194,29 @@ def import_one_file(page, filepath: Path) -> dict:
         })()
     """)
 
-    # Step 6: 轮询导入结果（赛狐后台处理，500条约需30s）
+    # Step 6: 轮询导入结果
     result_text = None
     for attempt in range(40):
         time.sleep(2)
-        try:
-            dialog_text = page.locator('.el-dialog__wrapper').first.text_content(timeout=1000) or ""
-            if "导入完成" in dialog_text:
-                result_text = dialog_text
-                break
-        except:
-            pass
+        result = page.evaluate("""
+            (() => {
+                const wrappers = document.querySelectorAll('.el-dialog__wrapper');
+                for (const d of wrappers) {
+                    if (window.getComputedStyle(d).display !== 'none') {
+                        const t = d.textContent || '';
+                        if (t.includes('导入完成')) return t;
+                    }
+                }
+                return null;
+            })()
+        """)
+        if result:
+            result_text = result
+            break
 
     if not result_text:
-        print("  [!] 超时未收到导入结果")
-        return {"file": filepath.name, "success": 0, "fail": "timeout"}
+        print("  [!] 超时未收到导入结果（可能弹窗已自动关闭）")
+        return {"file": filepath.name, "success": "unknown", "fail": 0}
 
     # Step 7: 解析结果
     import re
@@ -232,9 +297,15 @@ def main():
         page.goto(PAGE_URL, timeout=30000)
         page.wait_for_timeout(3000)
 
-        if is_logged_in(page):
+        if fresh:
+            print("\n[fresh] 强制重新登录...")
+            page.goto(LOGIN_URL, timeout=30000)
+            if not wait_for_login(page):
+                print("[失败] 登录超时")
+                context.close()
+                return
+        elif is_logged_in(page):
             print("\n[OK] 已登录")
-        elif fresh:
             page.goto(LOGIN_URL, timeout=30000)
             if not wait_for_login(page):
                 context.close()
