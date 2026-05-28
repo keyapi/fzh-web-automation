@@ -265,7 +265,8 @@ def import_one_file(page, filepath: Path) -> dict:
 
 def main():
     fresh = "--fresh" in sys.argv
-    args = [a for a in sys.argv[1:] if a != "--fresh"]
+    headless = "--headless" in sys.argv
+    args = [a for a in sys.argv[1:] if a not in ("--fresh", "--headless")]
 
     files = []
     if args and not args[0].startswith("--"):
@@ -290,7 +291,7 @@ def main():
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
             user_data_dir=str(PROFILE_DIR),
-            headless=False,
+            headless=headless,
         )
         page = context.pages[0] if context.pages else context.new_page()
 
@@ -305,11 +306,9 @@ def main():
                 context.close()
                 return
         elif is_logged_in(page):
-            print("\n[OK] 已登录")
-            page.goto(LOGIN_URL, timeout=30000)
-            if not wait_for_login(page):
-                context.close()
-                return
+            print("\n[OK] 已登录，跳过登录步骤")
+            page.goto(PAGE_URL, timeout=30000)
+            page.wait_for_timeout(3000)
         else:
             print("\n[!] 未登录 → 打开登录页")
             page.goto(LOGIN_URL, timeout=30000)
