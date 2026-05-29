@@ -83,28 +83,49 @@ def search_sku(page, sku: str):
     page.wait_for_timeout(3000)
 
 
-def confirm_latest_outbound(page, sku: str) -> int:
-    """确认最新的待确认出库单（只点第一个确认出库按钮）。返回点击次数。"""
-    print("  确认出库（点击最新待确认记录）...")
-    clicked = page.evaluate("""
-        (() => {
-            const allBtns = document.querySelectorAll('button');
-            for (const btn of allBtns) {
-                if (btn.textContent.trim() === '确认出库' && btn.offsetParent !== null) {
-                    btn.click();
-                    return 'clicked';
+def confirm_all_outbound(page) -> int:
+    """确认页面上所有待确认的出库单（每确认一笔刷新页面检查）。"""
+    print("  确认全部待确认出库单...")
+    confirmed = 0
+    for attempt in range(20):
+        # 刷新页面获取最新状态
+        page.goto(PAGE_URL, timeout=30000)
+        page.wait_for_timeout(5000)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+        # 清除 loading mask
+        page.evaluate("document.querySelectorAll('.el-loading-mask').forEach(m => m.remove())")
+        page.wait_for_timeout(500)
+
+        # 用 JS 查找并点击可见的确认出库按钮（跳过 Playwright 的 loading mask 限制）
+        clicked = page.evaluate("""
+            (() => {
+                const btns = document.querySelectorAll('button');
+                for (const btn of btns) {
+                    if (btn.textContent.trim() === '确认出库' && btn.offsetParent !== null) {
+                        btn.click();
+                        return 'clicked';
+                    }
                 }
-            }
-            return 'not found';
-        })()
-    """)
-    if clicked == 'clicked':
-        print("  ✓ 确认出库已点击")
-        page.wait_for_timeout(3000)
-        return 1
-    else:
-        print("  ⚠ 未找到待确认出库按钮（可能已确认）")
-        return 0
+                return 'not found';
+            })()
+        """)
+        if clicked != 'clicked':
+            break
+        confirmed += 1
+        print(f"    ✓ 已确认第{confirmed}笔")
+
+        # 等待服务器处理完成（loading mask 出现→消失）
+        page.wait_for_timeout(2000)
+        try:
+            mask = page.locator('.el-loading-mask').first
+            mask.wait_for(state='attached', timeout=10000)
+            mask.wait_for(state='hidden', timeout=120000)
+        except:
+            page.wait_for_timeout(10000)
+
+    print(f"  确认完成: {confirmed} 笔")
+    return confirmed
 
 
 def import_one_file(page, filepath: Path, sku: str = None) -> dict:
@@ -175,9 +196,16 @@ def import_one_file(page, filepath: Path, sku: str = None) -> dict:
           if (btn.textContent.trim()==='关闭') btn.click(); });""")
     page.wait_for_timeout(500)
 
-    # 自验证 + 确认出库
+    # 确认出库：先刷新页面让新记录出现
+    print("  刷新页面...")
+    page.goto(PAGE_URL, timeout=30000)
+    page.wait_for_timeout(5000)
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    confirmed = confirm_all_outbound(page)
+
+    # 自验证
     verified = False
-    confirmed = 0
     if sku:
         print(f"  自验证: 搜索 SKU={sku}...")
         page.goto(PAGE_URL, timeout=30000)
@@ -192,9 +220,6 @@ def import_one_file(page, filepath: Path, sku: str = None) -> dict:
               if (r.textContent.includes('{sku}')) c++; }}); return c>0; }})()""")
         verified = bool(v)
         print(f"  {'✓' if verified else '✗'} SKU {'找到' if verified else '未找到'}")
-
-        if verified:
-            confirmed = confirm_latest_outbound(page, sku)
 
     return {"success": True, "verified": verified, "confirmed": confirmed}
 

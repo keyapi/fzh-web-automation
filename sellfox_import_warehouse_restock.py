@@ -100,6 +100,14 @@ def import_one_file(page, filepath: Path) -> dict:
         page.goto(PAGE_URL, timeout=30000)
         page.wait_for_timeout(5000)
 
+    # 确保在"全部"tab（否则"添加单据"按钮可能不显示）
+    page.evaluate("""
+        (() => { for (const el of document.querySelectorAll('*')) {
+          if (el.childNodes.length===1 && el.childNodes[0].nodeType===3 && el.textContent.trim()==='全部') {
+            el.parentElement.click(); return; } } })()
+    """)
+    page.wait_for_timeout(2000)
+
     # 关闭公告弹窗 + 等待「添加单据」按钮 → 检测到立即点击
     print("  等待页面渲染 + 点击添加单据...")
     for attempt in range(30):
@@ -196,7 +204,7 @@ def import_one_file(page, filepath: Path) -> dict:
 
     # Step 6: 轮询导入结果
     result_text = None
-    for attempt in range(40):
+    for attempt in range(120):  # 大文件可能需要60s+
         time.sleep(2)
         result = page.evaluate("""
             (() => {
