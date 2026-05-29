@@ -118,47 +118,32 @@ def select_order_checkbox(page, order_no: str) -> bool:
 
 
 def click_toolbar_button(page, button_text: str) -> bool:
-    """点击工具栏按钮。"""
-    return page.evaluate(f"""
-        (() => {{
-            for (const el of document.querySelectorAll('button')) {{
-                if (el.textContent.trim() === '{button_text}' && el.offsetParent !== null) {{
-                    el.click();
-                    return true;
-                }}
-            }}
-            return false;
-        }})()
-    """)
+    """点击工具栏按钮（Playwright 原生 click 确保事件正确触发）。"""
+    try:
+        btn = page.locator('button', has_text=button_text).first
+        btn.wait_for(state='visible', timeout=5000)
+        btn.click()
+        return True
+    except Exception:
+        return False
 
 
 def confirm_dialog(page) -> bool:
-    """在发货确认弹窗点击"确定"。返回是否找到弹窗。"""
-    for _ in range(20):
-        time.sleep(1)
-        result = page.evaluate("""
-            (() => {
-                const wrappers = document.querySelectorAll('.el-message-box__wrapper');
-                for (const d of wrappers) {
-                    if (window.getComputedStyle(d).display !== 'none') {
-                        for (const btn of d.querySelectorAll('button')) {
-                            if (btn.textContent.trim() === '确定') {
-                                btn.click();
-                                return 'clicked';
-                            }
-                        }
-                        return 'no 确定 button';
-                    }
-                }
-                return 'no dialog';
-            })()
-        """)
-        if result == 'clicked':
-            return True
-        if result == 'no dialog':
-            time.sleep(1)
-            continue
-    return False
+    """在发货确认弹窗点击"确定"。用 Playwright 原生等待，不依赖 JS evaluate 时序。"""
+    try:
+        # 等待弹窗出现
+        dialog = page.locator('.el-message-box__wrapper').filter(has=page.locator('button', has_text='确定'))
+        dialog.wait_for(state='visible', timeout=15000)
+        page.wait_for_timeout(500)
+        # 点击确定
+        btn = dialog.locator('button', has_text='确定').first
+        btn.click()
+        # 等待弹窗消失
+        page.wait_for_timeout(1000)
+        dialog.wait_for(state='hidden', timeout=30000)
+        return True
+    except Exception:
+        return False
 
 
 def filter_by_time(orders: list[dict], after: str) -> list[dict]:
@@ -194,26 +179,26 @@ def allocate_all_pending(page, after: str = None) -> list[str]:
         print("  无待处理订单")
         return []
 
-    processed = []
+    # 一次性勾选所有目标订单
+    selected = 0
     for o in orders:
-        print(f"  分配: {o['orderNo']} ({o['warehouse']})")
-        if not select_order_checkbox(page, o["orderNo"]):
-            print(f"    ✗ 勾选失败")
-            continue
-        page.wait_for_timeout(300)
-        click_toolbar_button(page, "分配库存")
-        page.wait_for_timeout(1500)
-        processed.append(o["orderNo"])
-        print(f"    ✓ 已分配")
+        if select_order_checkbox(page, o["orderNo"]):
+            selected += 1
+    print(f"  已勾选: {selected}/{len(orders)}")
+    page.wait_for_timeout(300)
 
-    print(f"  完成: {len(processed)}/{len(orders)}")
+    click_toolbar_button(page, "分配库存")
+    page.wait_for_timeout(2000)
+
+    processed = [o["orderNo"] for o in orders]
+    print(f"  完成: 分配 {len(processed)} 单")
     return processed
 
 
 def ship_all_pending(page, after: str = None) -> list[str]:
-    """发货：待发货 → 勾选 → 发货 → 确定弹窗。返回处理的单号列表。"""
+    """发货：全部勾选 → 一次发货 → 确定弹窗。返回处理的单号列表。"""
     print("\n--- 发货 ---")
-    click_side_menu(page, "自建仓")  # 待发货下的自建仓子项
+    click_side_menu(page, "自建仓")
     page.keyboard.press("Escape")
     page.wait_for_timeout(500)
 
@@ -227,25 +212,25 @@ def ship_all_pending(page, after: str = None) -> list[str]:
         print("  无待处理订单")
         return []
 
-    processed = []
+    # 一次性勾选所有目标订单
+    selected = 0
     for o in orders:
-        print(f"  发货: {o['orderNo']} ({o['warehouse']})")
-        if not select_order_checkbox(page, o["orderNo"]):
-            print(f"    ✗ 勾选失败")
-            continue
-        page.wait_for_timeout(300)
-        click_toolbar_button(page, "发货")
-        page.wait_for_timeout(1500)
+        if select_order_checkbox(page, o["orderNo"]):
+            selected += 1
+    print(f"  已勾选: {selected}/{len(orders)}")
+    page.wait_for_timeout(300)
 
-        if confirm_dialog(page):
-            page.wait_for_timeout(2000)
-            processed.append(o["orderNo"])
-            print(f"    ✓ 已发货")
-        else:
-            print(f"    ✗ 未找到确认弹窗")
+    if not click_toolbar_button(page, "发货"):
+        print("  ✗ 未找到发货按钮")
+        return []
 
-    print(f"  完成: {len(processed)}/{len(orders)}")
-    return processed
+    if confirm_dialog(page):
+        page.wait_for_timeout(3000)
+        print(f"  ✓ 已发货: {[o['orderNo'] for o in orders]}")
+        return [o["orderNo"] for o in orders]
+    else:
+        print("  ✗ 未找到确认弹窗")
+        return []
 
 
 def verify_status(page, menu: str, expected_orders: list[str]) -> bool:
@@ -308,28 +293,21 @@ def main():
 
         # Step 1: 分配库存
         allocated = allocate_all_pending(page, after=after)
-        if not allocated:
-            print("\n无订单可分配，结束")
-            context.close()
-            return
+        if allocated:
+            print(f"\n分配完成: {len(allocated)} 单")
 
         if allocate_only:
             print(f"\n仅分配模式完成。{len(allocated)} 单已分配库存")
             context.close()
             return
 
-        # Step 2: 验证已进入待发货
-        verify_status(page, "自建仓", allocated)
+        if allocated:
+            verify_status(page, "自建仓", allocated)
 
-        # Step 3: 发货
+        # Step 2: 发货（即使没有新分配的单，也可能有待发货的）
         shipped = ship_all_pending(page, after=start_time)
-        if not shipped:
-            print("\n无订单可发货，结束")
-            context.close()
-            return
-
-        # Step 4: 验证已进入待收货
-        verify_status(page, "待收货", shipped)
+        if shipped:
+            verify_status(page, "待收货", shipped)
 
         # 汇总
         print(f"\n{'='*50}")
