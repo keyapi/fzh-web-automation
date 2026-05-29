@@ -22,7 +22,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
+PROFILE_DIR = SCRIPT_DIR.parent / "sellfox-profile"
 
 PAGE_URL = "https://www.sellfox.com/amzup-web-main/web/warehouse/stockOrder/index.html"
 LOGIN_URL = "https://www.sellfox.com/amzup-web-main/login.html"

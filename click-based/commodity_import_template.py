@@ -26,7 +26,7 @@ import pandas as pd
 sys.stdout.reconfigure(encoding='utf-8')
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
+PROFILE_DIR = SCRIPT_DIR.parent / "sellfox-profile"
 DOWNLOADS_DIR = SCRIPT_DIR / "downloads"
 
 LOGIN_URL = "https://www.sellfox.com/amzup-web-main/login.html"

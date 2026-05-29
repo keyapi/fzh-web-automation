@@ -20,7 +20,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 from playwright.sync_api import sync_playwright
 
 SCRIPT_DIR = Path(__file__).resolve().parent
-PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
+PROFILE_DIR = SCRIPT_DIR.parent / "sellfox-profile"
 DEFAULT_IMPORT_DIR = SCRIPT_DIR / "outbound"
 
 PAGE_URL = "https://www.sellfox.com/amzup-web-main/web/warehouse/otherOut/index.html"
