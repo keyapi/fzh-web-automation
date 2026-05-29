@@ -29,6 +29,7 @@ PROFILE_DIR = SCRIPT_DIR / "sellfox-profile"
 PAGE_URL = "https://www.sellfox.com/amzup-web-main/web/warehouse/stockOrder/index.html"
 LOGIN_URL = "https://www.sellfox.com/amzup-web-main/login.html"
 LOGIN_TIMEOUT = 300
+WARMUP_URL = "https://www.sellfox.com/amzup-web-main/web/warehouse/detailed/index.html"
 
 
 def wait_for_login(page):
@@ -60,14 +61,13 @@ def is_logged_in(page):
 
 
 def click_side_menu(page, menu_text: str):
-    """点击左侧状态菜单: 待配货 / 待发货(自建仓) / 待收货"""
+    """点击左侧状态菜单。用 .menu_title（MCP验证可切换）。"""
     page.evaluate(f"""
         (() => {{
-            const spans = document.querySelectorAll('span.line_clamp');
-            for (const span of spans) {{
-                if (span.textContent.trim() === '{menu_text}') {{
-                    span.parentElement.click();
-                    return 'clicked';
+            const titles = document.querySelectorAll('.menu_title');
+            for (const t of titles) {{
+                if (t.textContent.trim().startsWith('{menu_text}') && !t.classList.contains('active')) {{
+                    t.click(); return;
                 }}
             }}
         }})()
@@ -129,18 +129,29 @@ def click_toolbar_button(page, button_text: str) -> bool:
 
 
 def confirm_dialog(page) -> bool:
-    """在发货确认弹窗点击"确定"。用 Playwright 原生等待，不依赖 JS evaluate 时序。"""
+    """在发货确认弹窗点击"确定"。Element UI message-box 对 Playwright 可见性检查不可靠，用 JS evaluate。"""
     try:
-        # 等待弹窗出现
-        dialog = page.locator('.el-message-box__wrapper').filter(has=page.locator('button', has_text='确定'))
-        dialog.wait_for(state='visible', timeout=15000)
-        page.wait_for_timeout(500)
-        # 点击确定
-        btn = dialog.locator('button', has_text='确定').first
-        btn.click()
-        # 等待弹窗消失
-        page.wait_for_timeout(1000)
-        dialog.wait_for(state='hidden', timeout=30000)
+        # 等弹窗出现
+        page.wait_for_timeout(2000)
+        # 用 JS 找到可见的确认弹窗并点击确定
+        clicked = page.evaluate("""
+            (() => {
+                const wrappers = document.querySelectorAll('.el-message-box__wrapper');
+                for (const w of wrappers) {
+                    if (w.offsetWidth > 0) {
+                        const btn = w.querySelector('button.el-button--primary');
+                        if (btn && btn.textContent.trim() === '确定') {
+                            btn.click(); return true;
+                        }
+                    }
+                }
+                return false;
+            })()
+        """)
+        if not clicked:
+            return False
+        # 等弹窗消失
+        page.wait_for_timeout(2000)
         return True
     except Exception:
         return False
@@ -274,8 +285,27 @@ def main():
             user_data_dir=str(PROFILE_DIR), headless=headless)
         page = context.pages[0] if context.pages else context.new_page()
 
+        # SPA 预热（参考 sellfox_import_warehouse_restock.py）
+        page.goto(WARMUP_URL, timeout=30000)
+        page.wait_for_timeout(5000)
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
         page.goto(PAGE_URL, timeout=30000)
         page.wait_for_timeout(5000)
+
+        # 如果还在 dashboard — 重试
+        url = page.evaluate("() => location.href")
+        if "dashboard" in url or "warehouse" not in url:
+            page.goto(PAGE_URL, timeout=30000)
+            page.wait_for_timeout(5000)
+
+        # 确保在"全部"tab
+        page.evaluate("""
+            (() => { for (const el of document.querySelectorAll('*')) {
+              if (el.childNodes.length===1 && el.childNodes[0].nodeType===3 && el.textContent.trim()==='全部') {
+                el.parentElement.click(); return; } } })()
+        """)
+        page.wait_for_timeout(2000)
 
         if is_logged_in(page):
             print("[OK] 已登录")
@@ -287,6 +317,18 @@ def main():
 
         page.keyboard.press("Escape")
         page.wait_for_timeout(500)
+
+        # 点「重置」清除过滤条件
+        page.evaluate("""
+            (() => {
+                for (const el of document.querySelectorAll('*')) {
+                    if (el.textContent.trim() === '重置' && el.offsetWidth > 0) {
+                        el.click(); return;
+                    }
+                }
+            })()
+        """)
+        page.wait_for_timeout(2000)
 
         # 记录开始时间（如果未指定 --after，用当前时间）
         start_time = after or datetime.now().strftime("%H:%M")
