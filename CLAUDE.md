@@ -116,18 +116,18 @@
 ├── CLAUDE.md                  # 本文件
 ├── PROJECT.md                 # 详细项目文档
 ├── README_给同事.md           # 给同事的入口文档
-├── README_自动化.txt          # 快速入门
 ├── SKILL_quick_start.md       # Skill: 通用环境安装
 ├── SKILL_web_automation.md    # Skill: 浏览器自动化通用模式
 ├── SKILL_deploy_playwright_mcp.md  # Skill: MCP 部署详解
 ├── SKILL_tongtu_automation.md     # Skill: 通途专项自动化
-├── sellfox_auto_export.py          # 赛狐库存导出（浏览器+API）
-├── sellfox_import_update.py        # 赛狐商品导入更新（闭环验证）
-├── sellfox_import_other_outbound.py # 赛狐其他出库一键导入
-├── sellfox_import_warehouse_restock.py # 赛狐海外仓备货单一键导入
-├── sellfox_restock_allocate_ship.py   # 备货单分配库存+发货
-├── sellfox_restock_receive.py         # 备货单批量SKU收货
-├── commodity_import_template.py    # 赛狐下载商品导入模板
+├── sellfox_auto_export.py          # 赛狐库存导出（浏览器+API 双模式）
+├── sellfox_restock_api.py          # 海外仓备货单 API E2E（导入→收货）
+├── click-based/                    # 旧点击脚本（保留参考）
+│   ├── AGENT_HANDOFF.md
+│   ├── sellfox_import_warehouse_restock.py
+│   ├── sellfox_restock_allocate_ship.py
+│   ├── sellfox_restock_receive.py
+│   └── ...
 └── sellfox-profile/                # 赛狐持久化登录 (gitignore)
 ```
 
