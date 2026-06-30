@@ -16,6 +16,7 @@ timestamp: 2026-06-30
 | 赛狐踩坑 + 选择器 | [sellfox-pitfalls.md](reference/sellfox-pitfalls.md) |
 | WebFetch 修复方法 | [webfetch-fix.md](lessons/webfetch-fix.md) |
 | Hooks 学习结论 | [hooks-learning.md](lessons/hooks-learning.md) |
-| 通途自动化入门 | [../.claude/skills/tongtu-automation/SKILL.md](../.claude/skills/tongtu-automation/SKILL.md) |
-| 赛狐自动化入门 | [../.claude/skills/sellfox-automation/SKILL.md](../.claude/skills/sellfox-automation/SKILL.md) |
+| 非技术同事上手操作 | [onboarding.md](onboarding.md) |
+| 通途自动化入门 | [../.agents/skills/tongtu-automation/SKILL.md](../.agents/skills/tongtu-automation/SKILL.md) |
+| 赛狐自动化入门 | [../.agents/skills/sellfox-automation/SKILL.md](../.agents/skills/sellfox-automation/SKILL.md) |
 | 变更记录 | [log.md](log.md) |

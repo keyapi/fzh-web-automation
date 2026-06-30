@@ -1,55 +1,25 @@
-# 通途库存自动化 — 给同事的启动包
+# 通途库存下载 — 给同事
 
-> 把这个文件夹拷贝到你的电脑，打开 Claude Desktop（Code 模式），然后对 Claude 说：
-> **"帮我设置自动化环境"** 即可开始。
+> 零编程基础，对 Codex 说人话就行。
 
-## 你需要什么
+## 三步开始
 
-- Claude Desktop 已安装（第三方/deployment 模式）
-- 一台能上网的电脑（Windows 10+ 或 Mac）
-- 不需要会编程
+1. **拿到项目**：`git clone https://gitee.com/keyapi/fzh-web-automation`
+2. **Codex 添加项目**：左侧项目列表 → 添加 → 选 `fzh-web-automation` 文件夹 → 信任项目
+3. **对 Codex 说**：**"帮我设置自动化环境"**
 
-## 三种用法
+环境就绪后，对 Codex 说：
 
-### 1. 通途库存导出
+> **通途导出库存**
 
-对 Claude 说：
+首次需要手动登录一次（浏览器弹窗），以后全自动。
 
-> 帮我导出通途库存结存的所有 6 个仓库，并生成导入文件
+## 详细指南
 
-Claude 会自动打开浏览器、切换仓库、下载文件、生成导入 Excel。
+→ **[docs/onboarding.md](docs/onboarding.md)** — 完整操作步骤、常用对话、常见问题
 
-### 2. 通途其他页面
+## 项目文件
 
-对 Claude 说：
-
-> 帮我打开通途的 XX 页面，自动做 YY 操作
-
-### 3. 赛狐操作
-
-对 Claude 说：
-
-> 赛狐导出库存 / 赛狐搜索 SKU KS0001
-
-## 首次使用步骤
-
-1. 把这个文件夹拷贝到你的电脑
-2. 打开 Claude Desktop，切换到 **Code 模式**
-3. 用 Claude Desktop 打开这个文件夹
-4. 对 Claude 说：**"帮我设置自动化环境"**
-
-Claude 会自动安装 Node.js + uv + Playwright MCP，并验证一切正常。
-
-## 如果需要帮助
-
-对 Claude 说：
-
-> 我遇到了 XX 问题，帮我排查
-
-Claude 会读取 skill 文件中的踩坑记录来帮你。
-
-## 项目详情
-
-- [README.md](README.md) — 项目简介（人读）
-- [AGENTS.md](AGENTS.md) — Agent 指令源 + 行为规则
-- [.agents/skills/](.agents/skills/) — 自动化技能（Agent 自动加载）
+- [README.md](README.md) — 项目简介
+- [AGENTS.md](AGENTS.md) — Agent 规则
+- [.agents/skills/](.agents/skills/) — 自动化技能

@@ -9,6 +9,7 @@ timestamp: 2026-06-30
 
 ## 2026-06-30
 
+- **非技术同事上手文档**：新建 `docs/onboarding.md`，`README_给同事.md` 精简为入口
 - **项目标准化整改**：对齐 fzh-data 标准。
   - 新建 AGENTS.md（项目权威指令源）
   - CLAUDE.md 详细内容拆分到 docs/reference/ 和 docs/lessons/
