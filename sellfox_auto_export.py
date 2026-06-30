@@ -311,6 +311,23 @@ def run_browser(headless=False, demo_search=False):
             context.close()
             return True
 
+        # 确保导出全部库存（含零库存）：取消"隐藏0数据记录"勾选
+        print("[2.5] 检测隐藏0数据状态...")
+        total = int(page.evaluate(
+            "() => { const p = document.querySelector('.el-pagination');"
+            " return p ? (p.textContent.match(/共\\s*(\\d+)\\s*条/) || ['','0'])[1] : '0'; }"
+        ))
+        print(f"      当前共 {total} 条")
+        if total < 2000:
+            print(f"      隐藏0数据已勾选 → 取消勾选（导出全部库存）")
+            page.locator('span:text-is("隐藏0数据记录")').first.click()
+            page.wait_for_timeout(3000)
+            total_after = int(page.evaluate(
+                "() => { const p = document.querySelector('.el-pagination');"
+                " return p ? (p.textContent.match(/共\\s*(\\d+)\\s*条/) || ['','0'])[1] : '0'; }"
+            ))
+            print(f"      更新后共 {total_after} 条")
+
         # Step 3: 导出
         print("[3/4] 开始导出...")
         result = browser_export_flow(page)
