@@ -15,15 +15,15 @@
 | `generate_tongtu_import.py` | 核心脚本：读取库存清单 → 生成导入文件 |
 | `tongtu_auto_export.py` | 浏览器自动化：打开通途 → 依次选6个仓库 → 导出 → 调generate脚本 |
 | `pyproject.toml` | uv项目配置，依赖：pandas、openpyxl、playwright |
-| `SKILL_deploy_playwright_mcp.md` | Skill: Playwright MCP 部署详细版（给 Claude 看的踩坑指南） |
-| `SKILL_tongtu_automation.md` | Skill: 通途库存自动化专项（给 Claude 看的通途特化指南） |
-| `SKILL_quick_start.md` | Skill: 通用环境安装（Windows/Mac，零基础，一句话启动） |
-| `SKILL_web_automation.md` | Skill: 浏览器自动化通用模式（选择器、登录、下载、踩坑） |
+| `.agents/skills/playwright-setup/SKILL.md` | Skill: 环境安装（Windows/Mac，零基础，一句话启动） |
+| `.agents/skills/tongtu-automation/SKILL.md` | Skill: 通途库存自动化专项 |
+| `.agents/skills/sellfox-automation/SKILL.md` | Skill: 赛狐 ERP 自动化 |
+| `.agents/skills/web-automation/SKILL.md` | Skill: 浏览器自动化通用模式 |
 | `README_给同事.md` | 给同事看的人口文件：这是什么、怎么开始 |
 | `inspect_warehouse.py` | DOM诊断脚本：打开页面 → dump包含指定文字的DOM元素 → JSON输出 |
 | `chrome-profile/` | 持久化浏览器会话目录（自动创建，含cookies/localStorage，已在.gitignore排除） |
 | `mcp_to_output.py` | MCP模式桥接脚本：将 MCP 下载的文件整理到 downloads/ + output/ |
-| `extract_cookies.py` | 临时工具：从 chrome-profile 提取 cookies 供 MCP 注入（已整合到 tongtu_auto_export.py --export-cookies） |
+| `--export-cookies` | CLI 参数：从 chrome-profile 提取 cookies 供 MCP 注入（已整合到 tongtu_auto_export.py） |
 | `downloads/` | 多仓库模式：下载的原始库存清单（按仓库重命名） |
 | `output/` | 多仓库模式：生成的导入文件（按仓库重命名） |
 

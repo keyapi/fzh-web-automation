@@ -268,3 +268,207 @@ with pd.ExcelWriter('import.xlsx', engine='openpyxl') as w:
 - 选择文件后弹窗不显示任何变化（无文件名、无表格预览）
 - 直接点"导入"即可触发上传
 - 成功返回 `code:0` + task ID，无额外提示 |
+
+## 导入更新商品 — 仅改指定字段（已验证）
+
+可以通过导入仅更新指定字段，其他字段保持不变。
+
+### 已验证字段：开启质检流程
+
+| 属性 | 值 |
+|------|-----|
+| Excel 列名 | `开启质检流程` |
+| 开启值 | `是`（导入成功后质检 tab 可见该字段） |
+| 关闭值 | `否`（字段存在但状态为关闭） |
+| 必选列 | `*SKU` + `开启质检流程` |
+
+**Excel 构造**（仅 2 列，不改其他字段）：
+```python
+import pandas as pd
+df = pd.DataFrame([["test001-white", "否"]], columns=["*SKU", "开启质检流程"])
+with pd.ExcelWriter("import.xlsx", engine="openpyxl") as w:
+    df.to_excel(w, sheet_name="商品", index=False)
+```
+
+**触发 checkbox 的 JS 方法**（Dialog 中的 El-checkbox 需用此方式）：
+```python
+page.evaluate("""() => {
+    const d = [...document.querySelectorAll(".el-dialog__wrapper")]
+        .find(x => x.getBoundingClientRect().width > 0);
+    if (!d) return false;
+    const cb = [...d.querySelectorAll(".el-checkbox")]
+        .find(x => x.querySelector(".el-checkbox__label")?.textContent.trim() === "开启质检流程");
+    if (!cb) return false;
+    const input = cb.querySelector("input[type=checkbox]");
+    if (input) { input.checked = true; input.dispatchEvent(new Event("change", { bubbles: true })); }
+    const inner = cb.querySelector(".el-checkbox__inner");
+    if (inner) inner.click();
+    return true;
+}""")
+```
+
+> 同理可用于其他 68 个字段：找到中文标签名 → 构造 Excel 列 → 对话框中勾选 → 上传 → 导入。
+
+---
+
+## 通用模式：赛狐导入更新商品（适用于全部 69 字段）
+
+### 流程总览（6 步）
+
+```
+1. 登录 + 导航到商品列表页
+2. 打开"导入更新商品"弹窗
+       ↓
+3. 在弹窗中勾选目标字段 checkbox
+   └─ Element UI checkbox 需用 JS dispatchEvent 触发
+       ↓
+4. 构造 Excel（pd.DataFrame, sheet_name='商品'）
+   └─ 只需 *SKU + 目标字段列（不改的字段不出现）
+       ↓
+5. 上传文件 + 点"导入"
+   └─ 用 file_chooser.set_files() 绕过系统文件对话框
+       ↓
+6. 等待结果 + 验证
+   └─ 弹窗显示"成功X条，失败X条"
+   └─ 搜索 SKU → 打开详情弹窗 → 对应 tab 确认
+```
+
+### 3 个核心函数（可复用）
+
+```python
+# ── 函数1: 打开导入更新商品弹窗 ──
+def open_import_dialog(page):
+    page.evaluate("""() => {
+        const b = [...document.querySelectorAll("button")]
+            .find(x => x.textContent.trim() === "导入");
+        if (b) b.click();
+    }""")
+    page.wait_for_timeout(800)
+    page.evaluate("""() => {
+        const items = [...document.querySelectorAll(".el-dropdown-menu__item")];
+        const t = items.find(i => i.textContent.trim() === "导入更新商品");
+        if (t) t.click();
+    }""")
+    page.wait_for_timeout(3000)
+
+
+# ── 函数2: 勾选弹窗中的 checkbox ──
+def check_dialog_checkbox(page, label_text):
+    """勾选导入弹窗中的目标字段。支持任何字段名。"""
+    page.evaluate(f"""() => {{
+        const d = [...document.querySelectorAll(".el-dialog__wrapper")]
+            .find(x => x.getBoundingClientRect().width > 0);
+        if (!d) return false;
+        const cb = [...d.querySelectorAll(".el-checkbox")]
+            .find(x => x.querySelector(".el-checkbox__label")?.textContent.trim() === "{label_text}");
+        if (!cb) return false;
+        // 触发 Element UI checkbox 的 Vue 响应
+        const input = cb.querySelector("input[type=checkbox]");
+        if (input) {{ input.checked = true; input.dispatchEvent(new Event("change", {{ bubbles: true }})); }}
+        const inner = cb.querySelector(".el-checkbox__inner");
+        if (inner) inner.click();
+        return true;
+    }}""")
+    page.wait_for_timeout(500)
+
+
+# ── 函数3: 构造导入 Excel ──
+def make_import_excel(sku, columns, data_row, path):
+    """
+    参数:
+      sku: str — 要更新的 SKU
+      columns: list[str] — 列名列表，首列必须是 '*SKU'
+      data_row: list — 对应每列的值
+      path: Path — 输出路径
+    """
+    import pandas as pd
+    df = pd.DataFrame([data_row], columns=columns)
+    with pd.ExcelWriter(path, engine="openpyxl") as w:
+        df.to_excel(w, sheet_name="商品", index=False)
+    print(f"  Generated: {path.name}")
+```
+
+### 字段值格式参考
+
+| 字段类型 | 示例 Excel 列名 | 有效值 |
+|---------|----------------|--------|
+| 文本 | `品名`, `报关型号`, `商品备注` | 任意文本 |
+| 数值 | `报关单价`, `采购成本`, `加工费` | 数字 (如 15.5) |
+| 开关/checkbox | `开启质检流程`, `开启加工过程` | `是`(开) / `否`(关) |
+| 规格-尺寸 | `商品规格长(cm)` | 数字 (cm) |
+| 规格-重量 | `商品重量` | 数字, 单位在 `商品重量单位` 列 |
+| 规格-箱规 | `箱规长(cm)`, `单箱数量(PCS)` | 数字 |
+
+**数据在哪里验证**：在商品详情弹窗的对应 tab 中查看。
+- 基础信息 → 基础信息 tab
+- 物流信息 → 物流信息 tab
+- 采购信息 → 采购信息 tab
+- 质检信息 → 质检信息 tab
+- 规格信息 → 规格信息 tab
+- 头程信息 → 当前不确定在哪，需探索
+
+### 验证策略
+
+```python
+def verify_field(page, sku, tab_name, expected_text_fragment):
+    """通用验证：搜索SKU → 打开详情 → 切tab → 确认文本"""
+    # 搜索
+    page.get_by_placeholder("搜索内容").first.click()
+    page.get_by_placeholder("搜索内容").first.fill("")
+    page.get_by_placeholder("搜索内容").first.fill(sku)
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(3000)
+
+    # 点 SKU 打开详情
+    page.locator(f'span:has-text("{sku}")').first.click()
+    page.wait_for_timeout(2000)
+
+    # 切到目标 tab
+    page.get_by_role("tab", name=tab_name).click()
+    page.wait_for_timeout(1000)
+
+    # 读取弹窗文本
+    text = page.evaluate("""() => {
+        const d = [...document.querySelectorAll(".el-dialog__wrapper")]
+            .filter(x => x.getBoundingClientRect().width > 200);
+        return d[0]?.innerText || "";
+    }""")
+    return expected_text_fragment in text
+```
+
+### 使用示例（其他场景）
+
+```python
+# 例1: 修改采购成本
+cols = ["*SKU", "采购成本"]
+row  = ["test001-white", 25.0]
+make_import_excel("test001-white", cols, row, path)
+
+# 例2: 修改报关单价
+cols = ["*SKU", "报关单价", "报关单价币种"]
+row  = ["test001-white", 12.5, "USD"]
+make_import_excel("test001-white", cols, row, path)
+
+# 例3: 同时修改多个不相关字段
+cols = ["*SKU", "商品备注", "开启加工过程", "开启质检流程"]
+row  = ["test001-white", "备注内容", "是", "否"]
+make_import_excel("test001-white", cols, row, path)
+```
+
+### 扩展到赛狐其他模块（未来方向）
+
+"导入更新商品"的模式对赛狐其他模块有参考价值：
+
+| 模块 | 页面 | 预计导入机制 | 差异点 |
+|------|------|-------------|--------|
+| **库存 → 其他出库** | 未知 | 可能也有 el-dialog + Excel 导入 | 需探索 |
+| **库存 → 其他入库** | 未知 | 同上 | 需探索 |
+| **采购 → 采购单** | 未知 | 可能有导入 button | 需探索 |
+| **订单 → 发货** | 未知 | 批量导入发货？ | 需探索 |
+
+**通用化原则**：
+1. 固定的套路：寻找页面上的"导入"按钮 → 弹窗选择操作 → 上传 Excel
+2. 变化的只是：Excel 模板结构、字段映射、验证方式
+3. 每次都按 MCP 先探 → 记录 reference → 写代码 → 验证的流程
+
+每次探索新模块时，先用 MCP 打开页面、摸清导入按钮和 Excel 模板，再把发现记录到此文件的"其他模块"章节。

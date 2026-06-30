@@ -5,7 +5,7 @@ description: >
   当用户提到"赛狐"、"Sellfox"、"sellfox.com"、"库存明细"、"仓库导出"、
   "sku搜索"、"品名搜索"、"精确/模糊搜索"、"隐藏0数据"、"分页"等时触发。
   配合 references/code-snippets.md 可直接生成 Python Playwright 代码。
-  不要用于通途 (Tongtu) — 那是另一个独立系统 (见 SKILL_tongtu_automation.md)。
+  不要用于通途 (Tongtu) — 那是另一个独立系统 (见 tongtu-automation skill)。
 compatibility: >
   需要 Playwright MCP 或 Python Playwright (sync_api)。推荐配合
   SKILL_web_automation.md（通用选择器模式）、references/code-snippets.md（代码模板）。
@@ -27,10 +27,18 @@ metadata:
 - **永远**不在 SKILL.md 里硬编码密码或 token
 - **永远**定位 dialog 时过滤 visible：赛狐页面有 20+ 个隐藏的 `.el-dialog__wrapper`
   必须 `[...wrappers].filter(w=>w.getBoundingClientRect().width>0)`
+- **库存修改铁律**：凡是涉及到库存数量或成本修改的操作（其他入库/其他出库等），
+  **必须**先下载库存明细备份文件（`sellfox_auto_export.py`），修改后再导出一次用于对照验证。
+  这是财务核算需要，不可跳过。
+- **备份导出铁律**：导出库存明细备份时**必须**取消"隐藏0数据记录"勾选，导出全部 2281 条（非 1494 条）。
+  因为零库存的 SKU 仍然有成本数据需要备份。`sellfox_auto_export.py` 已内置此逻辑。
+- **MCP 先探路铁律**：任何新页面/新功能、或不确定 URL 入口的操作，
+  **必须先用 MCP Playwright 浏览器探路**（截图 + snapshot + evaluate 摸清 DOM/选择器/交互流程），
+  **禁止**凭猜测凑 URL 或用 Python Playwright 反复试错。确认后再写 Python 代码。
 
 ## When NOT to Use
 
-- 通途 (Tongtu) ERP 操作 → 用项目根目录的 `SKILL_tongtu_automation.md`
+- 通途 (Tongtu) ERP 操作 → 通途 skill (`/skill tongtu-automation`)
 - 非赛狐网站的一般浏览器自动化 → 用 `SKILL_web_automation.md`
 - 纯数据分析（已有 Excel 文件） → 直接用 pandas/Python 脚本
 
@@ -148,7 +156,8 @@ context = p.chromium.launch_persistent_context(
 ## 参考
 
 - [库存明细页](references/warehouse-detailed.md) — 选择器、导出弹窗、API逆向、全部已知未知已闭环
-- [商品导入](references/commodity-import.md) — 导入更新商品弹窗(69字段)、下载模板、上传文件API、Excel格式陷阱
+- [商品列表导出](references/commodity-export.md) — `icon_sf_download` 导出机制、字段清单、代码复用仓库页
+- [商品导入](references/commodity-import.md) — 69字段清单、导入通用模式(3个核心函数)、Excel陷阱、可扩展至其他模块
 - [Python 代码片段](references/code-snippets.md) — MCP 选择器→Python Playwright 代码（含文件上传）
 - [项目主脚本-库存导出](../sellfox_auto_export.py) — 浏览器+API 双模式
 - [项目主脚本-商品导入](../sellfox_import_update.py) — 生成Excel→上传→闭环验证
