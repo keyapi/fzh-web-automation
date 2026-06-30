@@ -103,13 +103,12 @@ npm install -g @playwright/mcp
 ```
 AGENTS.md (< 200 lines)              ← 你正在读的，项目总纲 + 路由地图
 ├── README.md                        ← 人读项目介绍
+├── README_给同事.md                 ← 给同事的入口（→ docs/onboarding.md）
 ├── AGENT_HANDOFF.md                 ← Agent 交接文档（脚本清单、字段映射、边界条件）
-├── SKILL_quick_start.md             ← 同事环境设置（首次使用）
-├── SKILL_web_automation.md          ← 浏览器自动化通用模式
-├── SKILL_deploy_playwright_mcp.md   ← MCP 部署详解
 ├── docs/
 │   ├── index.md                     ← 文档导航
 │   ├── log.md                       ← 变更记录
+│   ├── onboarding.md                ← 非技术同事上手操作指南
 │   ├── reference/
 │   │   ├── tongtu-pitfalls.md       ← 通途 13 个踩坑记录
 │   │   ├── sellfox-pitfalls.md      ← 赛狐踩坑 + 选择器文档
