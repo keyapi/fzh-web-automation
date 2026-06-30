@@ -5,7 +5,7 @@
 ## 三步开始
 
 1. **拿到项目**：`git clone https://gitee.com/keyapi/fzh-web-automation`
-2. **Codex 添加项目**：左侧项目列表 → 添加 → 选 `fzh-web-automation` 文件夹 → 信任项目
+2. **Codex 添加项目**：左侧项目列表 → 添加 → 选 `fzh-web-automation` 文件夹
 3. **对 Codex 说**：**"帮我设置自动化环境"**
 
 环境就绪后，对 Codex 说：
