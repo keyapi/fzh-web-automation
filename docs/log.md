@@ -2,10 +2,17 @@
 okf: v0.1
 type: Log
 title: Changelog
-timestamp: 2026-06-30
+timestamp: 2026-07-07
 ---
 
 # Changelog
+
+## 2026-07-07
+
+- **通途下载文件名中文乱码修复**：
+  - Playwright download.suggested_filename GBK 编码→ mojibake，导致合并步骤静默跳过
+  - 修复：下载时用 Python 本地时间构造安全文件名；合并时用 iterdir() + 前缀匹配替代 glob()
+  - 新增坑 14 至 tongtu-pitfalls.md，更新相关交叉引用
 
 ## 2026-06-30
 

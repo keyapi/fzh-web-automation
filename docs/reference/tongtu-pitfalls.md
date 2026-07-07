@@ -1,10 +1,10 @@
 ---
 okf: v0.1
 type: Reference
-title: 通途踩坑记录 — 13 个踩坑汇总
+title: 通途踩坑记录 — 14 个踩坑汇总
 description: 通途 ERP 浏览器自动化中遇到的 13 个踩坑，含现象、根因、解决方案
 tags: [tongtu, pitfalls, playwright, extjs, cookie, encoding]
-timestamp: 2026-05-25
+timestamp: 2026-07-07
 ---
 
 # 通途踩坑记录
@@ -88,3 +88,43 @@ timestamp: 2026-05-25
 - **根因**：赛狐 SPA 侧边栏菜单只在点击"仓库"导航后动态展开，URL 无法直接访问
 - **正确做法**：先用 MCP Playwright 浏览器浏览页面 → 截图 → evaluate 搜 DOM → 点菜单找 URL，确认后只用 Python 写脚本
 - **教训级别**：10 分钟 MCP 探索可省 2+ 小时 Python 试错
+
+## 坑 14：Playwright download.suggested_filename 中文乱码（Windows）
+
+- **现象**：download.suggested_filename 返回乱码（如 ¿â´æ½á´æÇåµ¥ 而非 库存结存清单）
+- **根因**：通途服务器 Content-Disposition 使用 GBK 编码中文文件名，Playwright 在 Windows 上按 UTF-8 解码 → mojibake
+- **连锁影响**：
+  - 保存到磁盘的文件名永久损坏（中文变乱码）
+  - 后续 pathlib.glob(库存结存清单*.xlsx) 找不到文件 → 合并步骤静默跳过
+- **解决 1（下载时）**：不用 download.suggested_filename，改用 Python 本地时间构造安全文件名：
+  `python
+  from datetime import datetime
+  ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+  new_name = f"{prefix}_库存结存清单{ts}.xlsx"
+  download.save_as(str(DOWNLOADS_DIR / new_name))
+  `
+- **解决 2（合并时）**：不用 glob() 匹配中文关键词，改用 iterdir() + 前缀/后缀匹配：
+  `python
+  files = [f for f in dir.iterdir() if f.name.startswith(prefix) and f.suffix == ".xlsx"]
+  `
+  因为已损坏的文件名无法用中文关键词恢复，只能靠前缀匹配。
+
+## 坑 14：Playwright download.suggested_filename 中文乱码（Windows）
+
+- **现象**：download.suggested_filename 返回乱码（如 ¿â´æ½á´æÇåµ¥ 而非 库存结存清单）
+- **根因**：通途服务器 Content-Disposition 使用 GBK 编码中文文件名，Playwright 在 Windows 上按 UTF-8 解码 → mojibake
+- **连锁影响**：
+  - 保存到磁盘的文件名永久损坏（中文变乱码）
+  - 后续 pathlib.glob("库存结存清单*.xlsx") 找不到文件 → 合并步骤静默跳过
+- **解决 1（下载时）**：不用 download.suggested_filename，改用 Python 本地时间构造安全文件名：
+  `python
+  from datetime import datetime
+  ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+  new_name = f"{prefix}_库存结存清单{ts}.xlsx"
+  download.save_as(str(DOWNLOADS_DIR / new_name))
+  `
+- **解决 2（合并时）**：不用 glob() 匹配中文关键词，改用 iterdir() + 前缀/后缀匹配：
+  `python
+  files = [f for f in dir.iterdir() if f.name.startswith(prefix) and f.suffix == ".xlsx"]
+  `
+  因为已损坏的文件名无法用中文关键词恢复，只能靠前缀匹配。
