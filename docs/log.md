@@ -1,4 +1,4 @@
----
+﻿--- 
 okf: v0.1
 type: Log
 title: Changelog
@@ -8,6 +8,12 @@ timestamp: 2026-07-07
 # Changelog
 
 ## 2026-07-07
+
+- **通途销售及库存报表自动导出**：
+  - 新建 `tongtu_sales_report.py`：自动提交统计任务 → 轮询等待完成 → 下载 zip
+  - 新建 `process_sales_report.py`：解压 zip → 按「仓库」列分表 → FZH-DANEEY 系列合并为一个工作表
+  - MCP 浏览器探路选择器（Node REPL 内置 Playwright），确认完整操作流后再写代码
+  - 新增坑 15-19 至 tongtu-pitfalls.md
 
 - **通途下载文件名中文乱码修复**：
   - Playwright download.suggested_filename GBK 编码→ mojibake，导致合并步骤静默跳过
