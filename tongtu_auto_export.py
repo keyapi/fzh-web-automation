@@ -130,9 +130,12 @@ def click_export(page, warehouse_name):
         print(f"  [OK] 已点击导出，等待下载...")
 
     download = download_info.value
-    original = download.suggested_filename
     prefix = safe_prefix(warehouse_name)
-    new_name = f"{prefix}_{original}"
+    # Windows 文件名编码坑: download.suggested_filename 从 GBK 服务器
+    # Content-Disposition 解码后可能变成乱码。改用 Python 本地时间构造文件名。
+    from datetime import datetime
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    new_name = f"{prefix}_库存结存清单{ts}.xlsx"
     target = DOWNLOADS_DIR / new_name
     download.save_as(str(target))
     print(f"  [OK] 已保存: {new_name}")
@@ -297,8 +300,14 @@ def merge_all_inventory():
     all_dfs = []
     for wh in WAREHOUSES:
         prefix = safe_prefix(wh)
+        # Windows 文件名编码坑:
+        # Playwright download.suggested_filename 在 GBK 环境下可能返回乱码，
+        # 导致磁盘上的中文文件名变为 mojibake（如 "¿â´æ½á´æÇåµ¥"）。
+        # 因此不能用中文关键词匹配，改为前缀 + .xlsx 后缀匹配。
+        all_files = list(DOWNLOADS_DIR.iterdir())
         files = sorted(
-            DOWNLOADS_DIR.glob(f"{prefix}_库存结存清单*.xlsx"),
+            [f for f in all_files
+             if f.name.startswith(prefix) and f.suffix == ".xlsx"],
             key=lambda p: p.stat().st_mtime,
             reverse=True,
         )

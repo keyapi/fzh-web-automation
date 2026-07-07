@@ -67,10 +67,16 @@ def merge_downloads(downloads_dir, warehouses, output_path):
 
     for wh in warehouses:
         prefix = safe_prefix(wh)
+        # Windows 文件名编码坑:
+        # Playwright download.suggested_filename 在 GBK 环境下可能返回乱码，
+        # 导致磁盘上的中文文件名变为 mojibake（如 ¿â´æ½á´æÇåµ¥）。
+        # 因此不能用中文关键词匹配，改为前缀 + .xlsx 后缀匹配。
+        all_files = list(downloads_dir.iterdir())
         files = sorted(
-            downloads_dir.glob(f"{prefix}_库存结存清单*.xlsx"),
+            [f for f in all_files
+             if f.name.startswith(prefix) and f.suffix == ".xlsx"],
             key=lambda p: p.stat().st_mtime,
-            reverse=True,  # 最新的排前面
+            reverse=True,
         )
         if not files:
             print(f"  [跳过] {wh}: 未找到下载文件")
