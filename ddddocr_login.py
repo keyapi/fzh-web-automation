@@ -133,8 +133,11 @@ class DdddocrLogin:
             logger.warning("截图验证码失败: %s", e)
             return None
 
-    def solve_captcha(self, captcha_selector: str, use_preprocess: bool = True) -> Optional[str]:
-        """截图 → 预处理 → OCR → 返回文本"""
+    def solve_captcha(self, captcha_selector: str, use_preprocess: bool = True,
+                       min_length: int = 0) -> Optional[str]:
+        """截图 → 预处理 → OCR → 返回文本。
+        min_length: 最少字符数，低于此值视为识别失败返回 None。
+        """
         png = self.get_captcha(captcha_selector)
         if not png:
             return None
@@ -143,6 +146,10 @@ class DdddocrLogin:
         text = self._ocr_best_effort(body)
         if not text and use_preprocess:
             text = self._ocr_best_effort(png)  # 回退用原图再试
+
+        if text and min_length > 0 and len(text) < min_length:
+            logger.warning("OCR 结果仅 %d 位（需 ≥%d 位）: %s，视为失败", len(text), min_length, text)
+            text = None
 
         if not text:
             fb = os.environ.get("OCR_FALLBACK", "stdin")
@@ -167,9 +174,10 @@ class DdddocrLogin:
         el.wait_for(state="visible", timeout=15000)
         el.fill(value)
 
-    def solve_and_fill(self, captcha_selector: str, input_selector: str) -> Optional[str]:
+    def solve_and_fill(self, captcha_selector: str, input_selector: str,
+                        min_length: int = 0) -> Optional[str]:
         """识别验证码并填入输入框"""
-        text = self.solve_captcha(captcha_selector)
+        text = self.solve_captcha(captcha_selector, min_length=min_length)
         if not text:
             return None
         self.fill_field(input_selector, text)
@@ -272,10 +280,12 @@ class DdddocrLogin:
         url_fragment: str,
         exclude_fragment: str = "",
         retry_delay: float = 0.45,
+        captcha_min_length: int = 0,
     ) -> bool:
         """
         主循环：填表 → OCR → 登录 → 验证，最多 max_attempts 次。
         返回 True（成功）或 False（全部重试耗尽）。
+        captcha_min_length: 验证码最少位数，不足则刷新重试。
         """
         for attempt in range(1, self.max_attempts + 1):
             logger.info("第 %d/%d 次尝试登录...", attempt, self.max_attempts)
@@ -286,7 +296,8 @@ class DdddocrLogin:
                 time.sleep(retry_delay)
                 continue
 
-            text = self.solve_and_fill(captcha_selector, captcha_input_selector)
+            text = self.solve_and_fill(captcha_selector, captcha_input_selector,
+                                       min_length=captcha_min_length)
             if not text:
                 logger.warning("验证码识别失败，重试...")
                 time.sleep(retry_delay)

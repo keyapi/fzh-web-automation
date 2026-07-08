@@ -65,6 +65,7 @@ def login(page) -> bool:
         login_btn_selector=SELECTORS["login_btn"],
         url_fragment=SUCCESS_FRAGMENT,
         exclude_fragment=EXCLUDE_FRAGMENT,
+        captcha_min_length=4,
     )
 
 

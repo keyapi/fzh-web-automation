@@ -78,8 +78,8 @@ def login(page) -> bool:
             pass
         page.wait_for_timeout(400)  # 等待新图片加载
 
-        # 2. 立刻截图+OCR
-        text = ocr.solve_captcha(SELECTORS["captcha_img"])
+        # 2. 立刻截图+OCR（至少4位字母数字）
+        text = ocr.solve_captcha(SELECTORS["captcha_img"], min_length=4)
         if not text:
             logger.warning("OCR 失败，重试...")
             time.sleep(0.3)
