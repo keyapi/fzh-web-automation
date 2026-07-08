@@ -2,8 +2,8 @@
 okf: v0.1
 type: Reference
 title: Gitee 贡献指南 — 非技术同事版
-description: 无需 GitHub 账号、无需翻墙，通过 Gitee 为 fzh-web-automation 贡献代码的完整流程
-tags: [gitee, contribution, non-technical, workbuddy, onboarding]
+description: 无需 GitHub 账号、无需翻墙，通过 Gitee 为 fzh-web-automation 贡献代码。两种模式：协作者模式（推荐，无需 Fork + Agent 全自动建 PR）和 Fork 模式（备用）
+tags: [gitee, contribution, non-technical, workbuddy, onboarding, collaborator]
 timestamp: 2026-07-08
 ---
 
@@ -11,133 +11,198 @@ timestamp: 2026-07-08
 
 > 你没有 GitHub 账号、不能翻墙？没关系。通过 Gitee（码云）贡献代码，项目主会帮你合并到 GitHub。
 
-## 前提
+## 模式选择
 
-- 你能访问 [gitee.com](https://gitee.com)（国内直连，不需要 VPN）
-- 你有一个邮箱（注册 Gitee 用）
-- 你的电脑上已经装好了 AI Agent（WorkBuddy / Codex / Claude Desktop）
+| 模式 | 适合谁 | 人工步骤 | PR 创建方式 |
+|------|--------|---------|------------|
+| **A. 协作者模式**（推荐） | 内部同事，已被加为仓库协作者 | 仅注册 Gitee | Agent 调 API 自动建 |
+| B. Fork 模式（备用） | 外部贡献者，未被加为协作者 | 注册 + Fork + 网页点按钮 | 人工网页操作 |
 
----
-
-## 第一步：注册 Gitee 账号（只做一次）
-
-1. 打开 https://gitee.com
-2. 点右上角「注册」→ 用邮箱注册
-3. 验证邮箱 → 设置用户名（建议用拼音，如 `wangxiao`）→ 完成
-
-> 不需要手机号，邮箱即可注册。
+> 新同事默认走模式 A。项目主（keyapi）先把你加为协作者，之后一切由 Agent 搞定。
 
 ---
 
-## 第二步：Fork 仓库（只做一次）
+# 模式 A：协作者模式（推荐）
 
-Fork = 把项目主仓库复制一份到你自己的 Gitee 账号下，你在这份副本上改代码。
+## ⚠️ 第零步：通知项目主（你做一次）
+
+把你的 Gitee 用户名告诉 keyapi，他会在仓库后台把你加为协作者。
+
+之后你就有权限直接 push 到 `gitee.com/keyapi/fzh-web-automation`，无需 Fork。
+
+---
+
+## 之后所有操作：复制给 WorkBuddy
+
+如果你**已经在本地有代码**（比如之前 clone 过，有一个分支），复制下面这段：
+
+```
+我是 fzh-web-automation 项目的开发者，Gitee 用户名是 ___（填你的）。
+项目主已经把我加为仓库协作者。请严格按以下步骤把我的代码贡献上去：
+
+==== 第一步：配置 Gitee 认证（只做一次） ====
+
+1. 帮我打开浏览器，导航到 https://gitee.com/profile/personal_access_tokens
+   如果没登录，引导我先登录（手机号+密码）
+2. 引导我点「生成新令牌」
+   - 名称填 fzh-web-automation
+   - 权限勾选 projects（仓库读写）
+   - 点提交
+3. 让我把生成的令牌复制粘贴给你
+4. 把令牌写入项目根目录 .env 文件：GITEE_TOKEN=<令牌>
+5. 配置 git 记住凭证（避免每次输入）：
+   git config credential.helper store
+
+==== 第二步：同步最新 main 到我的分支 ====
+
+6. 先看看我现在在哪个分支，有没有未提交的改动（git status）
+7. git stash （暂存未提交改动）
+8. git remote -v （看当前 remote，如果是 keyapi 的仓库就不用改）
+9. git fetch origin main
+10. git checkout <我的功能分支名> （比如 ddddocr-auto-login）
+11. git rebase origin/main （把我的分支变基到最新 main）
+    ⚠️ 如果有冲突，帮我解决——改动以我的版本为准
+12. git stash pop （恢复暂存的改动）
+
+==== 第三步：读取项目规范 ====
+
+13. 读 AGENTS.md 全文
+14. 读 docs/reference/gitee-contribution-guide.md 全文
+15. 读 docs/reference/company-context.md
+
+==== 第四步：检查代码规范 ====
+
+16. git diff origin/main --name-only （列出我改了哪些文件）
+17. 检查每个文件：
+    - 脚本名是否用 sellfox_ 开头？不是就重命名
+    - 有没有 hardcode 密码/token/api_key？有就改成 os.getenv()
+    - pyproject.toml 里的依赖：用 uv add 管理。如果有 ddddocr：
+      uv add ddddocr selenium
+      uv add "onnxruntime==1.16.3"  ← 版本必须钉死，高版本 Windows DLL 报错
+    - 有没有 chrome-profile/ sellfox-profile/ .env 目录/文件被 track？如果有，确认 .gitignore 里已忽略
+18. 如果代码没有问题，跳到下一步。如果有问题，先修好。
+
+==== 第五步：写文档 ====
+
+19. 创建 docs/reference/sellfox-login-ocr.md（参照已有 docs 文件的 YAML frontmatter 格式）：
+    - type: Reference
+    - 脚本干什么用、怎么用、依赖什么包、踩过什么坑
+
+==== 第六步：提交 ====
+
+20. git add -A
+21. git diff --cached --name-only
+    ⚠️ 此时必须停止，列出所有待提交文件，等我说「确认」再继续
+22. 我确认后：
+    git commit -m "feat(sellfox): 添加 ddddocr 验证码自动识别登录"
+
+==== 第七步：推送 + 创建 PR ====
+
+23. git push origin <分支名>  （用自己的 Gitee token 推送，不必用 https://user:token@ 格式，因为 credential.helper store 已记住）
+    如果 git push 密码提示，输入你的 Gitee 用户名，密码用令牌（不是登录密码）
+24. 推送成功后，用 Gitee OpenAPI 创建 Pull Request：
+
+    curl -s -X POST "https://gitee.com/api/v5/repos/keyapi/fzh-web-automation/pulls" \
+      -H "Content-Type: application/json;charset=UTF-8" \
+      -d '{
+        "access_token": "<你的Gitee令牌>",
+        "title": "feat(sellfox): 添加 ddddocr 验证码自动识别登录",
+        "head": "<分支名>",
+        "base": "main",
+        "body": "## 改动\n- 用 ddddocr 实现赛狐登录拼图验证码自动识别\n- 新增 sellfox_login_ocr.py\n\n## 测试\n- 已在本地验证登录成功"
+      }'
+
+25. API 返回的 html_url 就是 Gitee 上的 PR 链接。把链接告诉我。
+```
+
+如果你**还没有本地代码**（从零开始），用下面这段：
+
+```
+我是 fzh-web-automation 项目的开发者，Gitee 用户名是 ___（填你的）。
+项目主已经把我加为仓库协作者。请帮我从零设置：
+
+==== 第一步：配置 Gitee 认证（只做一次） ====
+
+1. 帮我打开浏览器，导航到 https://gitee.com/profile/personal_access_tokens
+2. 引导我生成新令牌，权限选 projects
+3. 让我把令牌粘贴给你 → 写入项目根目录 .env
+
+==== 第二步：克隆仓库 ====
+
+4. git clone https://gitee.com/keyapi/fzh-web-automation.git .
+5. git config credential.helper store
+6. git checkout -b feature/my-contribution （创建功能分支）
+
+==== 第三步：安装环境 ====
+
+7. 检查 uv 是否安装，没装就装
+8. uv sync
+9. uv run playwright install chromium
+
+==== 第四步：读规范 ====
+
+10. 读 AGENTS.md、docs/reference/gitee-contribution-guide.md、docs/reference/company-context.md
+
+现在环境就绪，功能分支已创建。告诉我可以开始写代码了。
+```
+
+---
+
+## 再发新 PR（第二次及以后）
+
+第一次的 token 和 git 配置都好了。之后每次贡献只需：
+
+```
+我要提交一个新功能。Git 凭证已配好。
+
+1. git checkout main && git pull origin main
+2. git checkout -b feature/<功能名>
+3. [我写代码]
+4. 读 AGENTS.md 确认我没有违反规范
+5. git add -A && git commit -m "feat(scope): 描述"
+6. git push -u origin feature/<功能名>
+7. 用 Gitee API 创建 PR（token 在 .env 里）：
+   curl -s -X POST "https://gitee.com/api/v5/repos/keyapi/fzh-web-automation/pulls" \
+     -H "Content-Type: application/json;charset=UTF-8" \
+     -d '{"access_token":"<从.env读取>","title":"<标题>","head":"feature/<功能名>","base":"main","body":"<描述>"}'
+8. 告诉我 PR 链接
+```
+
+---
+
+# 模式 B：Fork 模式（备用）
+
+> 如果项目主没有把你加为协作者，或者你只是临时贡献一次，走 Fork 模式。
+
+## 第一步：注册 Gitee 账号（一次）
+
+打开 https://gitee.com → 注册 → 手机号或邮箱均可。
+
+## 第二步：Fork 仓库（一次）
 
 1. 打开 https://gitee.com/keyapi/fzh-web-automation
-2. 点右上角 **「Fork」** 按钮
-3. 确认 Fork 到你自己的账号下
+2. 点右上角 **Fork** → 确认
 
-Fork 完成后，你会有一个自己的仓库：`https://gitee.com/<你的用户名>/fzh-web-automation`
+## 第三步：Clone + 开发（Agent 操作）
 
----
-
-## 第三步：Clone 你的 Fork 到本地
-
-打开你的 Agent（WorkBuddy），粘贴以下种子指令：
+把下面粘贴给 WorkBuddy（把 `你的用户名` 换掉）：
 
 ```
-帮我设置 fzh-web-automation 项目：
-
-1. 检查 Git 是否安装——没装的话帮我装
-2. git clone https://gitee.com/<我的用户名>/fzh-web-automation.git ~/fzh-web-automation
-3. cd ~/fzh-web-automation
-4. 安装 uv（Python 包管理器）
-5. 运行 uv sync 安装项目依赖
-6. 运行 uv run playwright install chromium 装浏览器
-7. 读 AGENTS.md 了解项目规范
-8. 创建功能分支: git checkout -b feature/my-contribution
+git clone https://gitee.com/你的用户名/fzh-web-automation.git
+cd fzh-web-automation
+uv sync
+uv run playwright install chromium
+git checkout -b feature/my-contribution
+读 AGENTS.md 和 docs/reference/gitee-contribution-guide.md
 ```
 
-> 把 `<我的用户名>` 换成你的 Gitee 用户名。
+## 第四步：提交 PR（人工操作）
 
----
-
-## 第四步：开发和提交
-
-在你的功能分支上开发。每次改完代码后，告诉 Agent：
-
-```
-帮我提交代码：
-1. git add <改的文件>
-2. git commit -m "feat(模块): 做了什么"
-3. git push -u origin feature/my-contribution
-```
-
-Commit 格式用中文：`feat(sellfox): 添加验证码自动识别登录`
-
----
-
-## 第五步：创建 Pull Request
-
-你 push 完后：
-
-1. 打开你的 Gitee 仓库页面：`https://gitee.com/<你的用户名>/fzh-web-automation`
-2. Gitee 会提示「你推送了一个新分支」→ 点 **「创建 Pull Request」**
-3. 确认目标仓库是 `keyapi/fzh-web-automation`，目标分支是 `main`
-4. 填写标题和描述（Agent 可以帮你写）
-5. 点「提交」
-
-完成后项目主（keyapi）会收到通知，审查代码后手动合并到 GitHub。
-
----
-
-## WorkBuddy Agent 提示词模板
-
-把下面这段复制到 WorkBuddy 对话开头（新建一个对话）：
-
-```
-你是 fzh-web-automation 项目的开发助手。先读取项目根目录的 AGENTS.md 和 docs/ 下所有文档，理解项目规范，然后严格遵守：
-
-【代码规范】
-1. Python 脚本放根目录，命名 sellfox_*.py 或 tongtu_*.py
-2. 新增依赖用 uv add <包名>，不要手动改 pyproject.toml
-3. 禁止硬编码密码/token/密钥，用 os.getenv() 从 .env 读取
-4. 所有脚本用 uv run python <script.py> 运行
-
-【Git 规范】
-5. commit 格式: 中文 type(scope): 描述
-   类型: feat(新功能) / fix(修复) / docs(文档) / refactor(重构)
-6. 不要提交到 main 分支，始终在功能分支上工作
-7. 不要提交 chrome-profile/ sellfox-profile/ .env 等含敏感信息的文件
-
-【文档规范】
-8. 新增模块必须写 docs/ 文档，格式参照项目已有文件（顶部 YAML frontmatter）
-9. 文档用 OKF v0.1 标准: type 字段必填，可选值: Index/Reference/Log/Research/Spec/Lesson
-
-【质量要求】
-10. 做完功能后自己运行验证，确认输出正确
-11. 有疑问先问用户，不要假设
-12. 不要做没被要求的事情——最简方案优先
-```
+代码 push 后，打开自己的 Gitee 仓库页面 → 创建 Pull Request → 目标选 `keyapi/fzh-web-automation` main 分支。
 
 ---
 
 ## 项目规范速查
-
-### 文件夹结构
-
-```
-fzh-web-automation/
-├── sellfox_*.py          ← 赛狐相关脚本（放根目录）
-├── tongtu_*.py           ← 通途相关脚本（放根目录）
-├── click-based/          ← 旧版点击脚本，不要再往里加
-├── docs/                 ← 文档
-│   ├── reference/        ← 技术参考
-│   └── lessons/          ← 经验教训
-├── .claude/skills/       ← Agent Skill 定义
-├── AGENTS.md             ← 项目总纲（Agent 自动读）
-└── pyproject.toml        ← 项目依赖配置
-```
 
 ### 技术栈
 
@@ -148,24 +213,36 @@ fzh-web-automation/
 | 浏览器自动化 | Playwright |
 | Excel | pandas + openpyxl |
 
-### 如果你要加代码验证码识别（ddddocr）
+### Git 规范
 
-参考 fzh-data 项目的经验：
+- 分支命名：`feature/xxx` 或 `fix/xxx`
+- Commit 格式：中文 `type(scope): 描述`
+- 类型：`feat`（新功能）、`fix`（修复）、`docs`（文档）、`refactor`（重构）
+- **禁止**直接 push main、禁止提交密钥/密码
+
+### 代码规范
+
+- 脚本放根目录，命名 `sellfox_*.py` 或 `tongtu_*.py`
+- 禁止硬编码密码/token：一律 `os.getenv()`
+- 新增依赖：`uv add <包名>`
+- 运行：`uv run python <script.py>`
+
+### ddddocr 相关
 
 ```bash
 uv add ddddocr selenium
-uv add onnxruntime==1.16.3   # 钉死版本，高版本 Windows DLL 报错
+uv add "onnxruntime==1.16.3"   # 版本必须钉死！
 ```
 
 ---
 
 ## 常见问题
 
-### Q: Gitee 上提了 PR 后多久能合并？
-A: 项目主不定期检查 Gitee PR。如果你在 IM 上 ping 一下 keyapi 会更快。
+### Q: push 密码提示填什么？
+A: 用户名填 Gitee 用户名，密码填**私人令牌**（不是 Gitee 登录密码）。用 `git config credential.helper store` 之后只需输一次。
 
-### Q: 我的代码会被原样合并吗？
-A: 不一定。项目主可能会调整代码格式、文件名、文档以符合项目规范，然后以你的名义合并。
+### Q: Agent 创建的 PR 链接在哪？
+A: Gitee API 返回的 JSON 里 `html_url` 字段就是。
 
-### Q: 为什么要先 Fork 而不是直接 clone keyapi 的仓库？
-A: 你没有 keyapi 仓库的写权限，不能直接 push。Fork 到你自己账号下，你就有完全控制权了。
+### Q: PR 提了之后多久合并？
+A: 在 IM 上 ping keyapi。

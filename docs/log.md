@@ -10,8 +10,9 @@ timestamp: 2026-07-07
 ## 2026-07-08
 
 - **Gitee 贡献流程文档**：
-  - 新建 `docs/reference/gitee-contribution-guide.md`：非技术同事通过 Gitee 贡献代码的完整指南（注册 → Fork → PR），含 WorkBuddy Agent 提示词模板
-  - 新建 `docs/reference/gitee-to-github-merge.md`：项目主将 Gitee PR 手动合并回 GitHub 的 SOP
+  - 新建 `docs/reference/gitee-contribution-guide.md`（v1）：Fork 版贡献流程 + WorkBuddy 提示词模板
+  - 新建 `docs/reference/gitee-to-github-merge.md`：项目主 Gitee→GitHub 合并 SOP
+  - **v2 更新** `gitee-contribution-guide.md`：新增**协作者模式**（推荐）— 无需 Fork，Agent 通过 Gitee OpenAPI 自动创建 PR。仅需 1 步人工（注册 Gitee）+ keyapi 添加协作者，后续全由 Agent 接管
   - 更新 `docs/index.md`、`docs/reference/index.md`
 
 ## 2026-07-07
