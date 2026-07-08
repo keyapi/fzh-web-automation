@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
 赛狐登录 — ddddocr 自动识别验证码 + Playwright
+
+关键：验证码有时效，必须点击刷新后立刻识别+填入+登录。
 """
 import logging
 import os
 import sys
+import time
 
 from ddddocr_login import DdddocrLogin
 
@@ -13,64 +16,35 @@ logger = logging.getLogger(__name__)
 # ── 配置 ──
 LOGIN_URL = "https://www.sellfox.com/amzup-web-main/login.html"
 SUCCESS_FRAGMENT = "/home"
+MAX_ATTEMPTS = 10
 
 USERNAME = os.getenv("SELLFOX_USER", "")
 PASSWORD = os.getenv("SELLFOX_PASSWORD", "")
 
 # ── 选择器（2026-07 MCP 探路实测确认）──
 SELECTORS = {
-    "username": '#username',                                         # 密码登录 tab 下的用户名
-    "password": 'input[placeholder*="请输入密码"]',                    # 密码输入框
-    "captcha_img": 'img[src^="data:image/jpg"]',                     # 字母验证码（jpg，不匹配腾讯滑块 PNG）
-    "captcha_refresh": 'text=点击刷新',                               # 刷新验证码
+    "username": "#username",
+    "password": 'input[placeholder*="请输入密码"]',
+    "captcha_img": 'img[src^="data:image/jpg"]',
+    "captcha_refresh": 'text=点击刷新',
     "captcha_input": 'input[placeholder*="图形验证码"]',
     "login_btn": 'button:has-text("登录")',
     "auto_login_cb": 'text=5天内自动登录',
     "agree_cb": 'text=阅读并接受',
 }
-SLIDER_TEXT = "拖动下方拼图"
-
-
-def _has_slider(page) -> bool:
-    """检测腾讯滑块验证码是否弹出"""
-    try:
-        return page.locator(f'text={SLIDER_TEXT}').is_visible(timeout=3000)
-    except Exception:
-        return False
 
 
 def login(page) -> bool:
-    """
-    使用 ddddocr 自动登录赛狐。
-    返回 True（成功）或 False（失败）。
-    """
     if not USERNAME or not PASSWORD:
         logger.error("请设置环境变量 SELLFOX_USER 和 SELLFOX_PASSWORD")
         return False
 
-    ocr = DdddocrLogin(max_attempts=10)
+    ocr = DdddocrLogin()
     ocr.set_page(page)
 
     logger.info("导航到赛狐登录页...")
     page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(2000)
-
-    # 检测滑块 — Playwright 大概率触发腾讯滑块
-    if _has_slider(page):
-        logger.warning(
-            "检测到腾讯滑块验证码（Playwright 自动化触发）。"
-            "请在浏览器中手动拖动滑块完成验证（60s 超时）..."
-        )
-        try:
-            page.wait_for_selector(
-                f'text={SLIDER_TEXT}',
-                state="hidden",
-                timeout=60000,
-            )
-            logger.info("滑块已通过，继续自动登录...")
-        except Exception:
-            logger.error("滑块超时未完成，登录失败")
-            return False
+    page.wait_for_timeout(1500)
 
     # 勾选协议 + 自动登录
     try:
@@ -82,25 +56,57 @@ def login(page) -> bool:
     except Exception as e:
         logger.warning("勾选协议失败: %s", e)
 
-    # 先点一次验证码刷新，触发「点击刷新」文本出现
-    try:
-        page.locator(SELECTORS["captcha_refresh"]).click(timeout=3000)
-        page.wait_for_timeout(500)
-    except Exception:
-        # 如果还没出现就继续，login_loop 会截现有验证码
-        pass
+    # 填入账号密码（只填一次）
+    logger.info("填入账号密码...")
+    ocr.fill_field(SELECTORS["username"], USERNAME)
+    ocr.fill_field(SELECTORS["password"], PASSWORD)
 
-    def fill():
-        ocr.fill_field(SELECTORS["username"], USERNAME)
-        ocr.fill_field(SELECTORS["password"], PASSWORD)
+    # 主循环：刷新 → 立刻 OCR → 填入 → 登录
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-    return ocr.login_loop(
-        fill_fn=fill,
-        captcha_selector=SELECTORS["captcha_img"],
-        captcha_input_selector=SELECTORS["captcha_input"],
-        login_btn_selector=SELECTORS["login_btn"],
-        url_fragment=SUCCESS_FRAGMENT,
-    )
+        # 1. 点击刷新验证码
+        try:
+            page.locator(SELECTORS["captcha_refresh"]).click(timeout=3000)
+        except Exception:
+            pass  # 「点击刷新」可能还没出现
+        page.wait_for_timeout(400)  # 等待新图片加载
+
+        # 2. 立刻截图+OCR
+        text = ocr.solve_captcha(SELECTORS["captcha_img"])
+        if not text:
+            logger.warning("OCR 失败，重试...")
+            time.sleep(0.3)
+            continue
+
+        # 3. 填入验证码
+        try:
+            page.locator(SELECTORS["captcha_input"]).first.fill(text)
+        except Exception as e:
+            logger.warning("填入验证码失败: %s", e)
+            time.sleep(0.3)
+            continue
+
+        # 4. 点击登录
+        try:
+            page.locator(SELECTORS["login_btn"]).first.click()
+        except Exception as e:
+            logger.warning("点击登录失败: %s", e)
+            time.sleep(0.3)
+            continue
+
+        # 5. 等待结果
+        page.wait_for_timeout(2000)
+        url = page.url or ""
+        if SUCCESS_FRAGMENT in url:
+            logger.info("登录成功！URL: %s", url)
+            return True
+
+        logger.info("未跳转（验证码错误或过期），刷新重试...")
+        time.sleep(0.3)
+
+    logger.error("全部 %d 次尝试失败", MAX_ATTEMPTS)
+    return False
 
 
 if __name__ == "__main__":
