@@ -64,24 +64,28 @@ def login(page) -> bool:
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
-    # 主循环：读图 → OCR → 填入 → 登录（失败后页面自动刷新验证码，不需要手动点刷新）
+    # 主循环：刷新 → 读图 → OCR → 填入 → 登录
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-        # 仅在首次或显式需要时点击刷新
-        if attempt == 1 or not page.query_selector('img[src^="data:image/jpg"]'):
-            try:
-                page.evaluate(
-                    """() => {
-                        const input = document.querySelector('input[placeholder*="图形验证码"]');
-                        const link = input?.closest('.el-input')?.parentElement?.querySelector('a[href="javascript:"]');
-                        if (link) link.click();
-                    }"""
-                )
-                page.wait_for_selector('img[src^="data:image/jpg"]', state='attached', timeout=10000)
-                page.wait_for_timeout(300)
-            except Exception as e:
-                logger.warning("刷新验证码超时: %s", e)
+        # 点击刷新验证码 + 等新图
+        try:
+            page.evaluate(
+                """() => {
+                    const input = document.querySelector('input[placeholder*="图形验证码"]');
+                    const link = input?.closest('.el-input')?.parentElement?.querySelector('a[href="javascript:"]');
+                    if (link) link.click();
+                }"""
+            )
+        except Exception:
+            pass
+        try:
+            page.wait_for_selector('img[src^="data:image/jpg"]', state='attached', timeout=15000)
+            page.wait_for_timeout(300)
+        except Exception:
+            logger.warning("等待新验证码超时（网络慢），尝试用已有图片...")
+            # 如果当前有图就用，没有再跳过
+            if not page.query_selector('img[src^="data:image/jpg"]'):
                 continue
 
         # 读图 → OCR（至少4位）
