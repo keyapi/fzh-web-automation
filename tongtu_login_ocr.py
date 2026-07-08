@@ -76,14 +76,18 @@ if __name__ == "__main__":
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        ctx = browser.new_context()
-        pg = ctx.new_page()
+        context = p.chromium.launch_persistent_context(
+            user_data_dir="",
+            headless=False,
+            viewport={"width": 1280, "height": 800},
+            args=["--disable-blink-features=AutomationControlled"],
+        )
+        pg = context.pages[0] if context.pages else context.new_page()
 
         success = login(pg)
         print("登录成功！" if success else "登录失败")
         if success:
             pg.wait_for_timeout(3000)
 
-        browser.close()
+        context.close()
         sys.exit(0 if success else 1)
