@@ -50,12 +50,25 @@ def login(page) -> bool:
     page.wait_for_timeout(2000)
 
     # 勾选协议 + 自动登录
+    # 注意：agree label 内含 <a> 链接，必须点 el-checkbox__input 而非整个 label
     try:
         ocr.ensure_checkbox(SELECTORS["auto_login_cb"], "5天内自动登录")
     except Exception as e:
         logger.warning("勾选自动登录失败: %s", e)
     try:
-        ocr.ensure_checkbox(SELECTORS["agree_cb"], "阅读并接受协议")
+        page.evaluate(
+            """() => {
+                const labels = document.querySelectorAll('.el-checkbox');
+                for (const el of labels) {
+                    if (el.textContent.includes('阅读并接受') && !el.classList.contains('is-checked')) {
+                        const input = el.querySelector('.el-checkbox__input');
+                        if (input) input.click();
+                        break;
+                    }
+                }
+            }"""
+        )
+        page.wait_for_timeout(300)
     except Exception as e:
         logger.warning("勾选协议失败: %s", e)
 
