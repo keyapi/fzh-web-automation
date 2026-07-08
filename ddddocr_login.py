@@ -133,6 +133,22 @@ class DdddocrLogin:
             logger.warning("截图验证码失败: %s", e)
             return None
 
+    def solve_captcha_from_bytes(self, png: bytes, use_preprocess: bool = True,
+                                  min_length: int = 0) -> Optional[str]:
+        """直接传入图片字节 → OCR → 返回文本（不走浏览器截图）"""
+        body = self._preprocess(png) if use_preprocess else png
+        text = self._ocr_best_effort(body)
+        if not text and use_preprocess:
+            text = self._ocr_best_effort(png)
+
+        if text and min_length > 0 and len(text) < min_length:
+            logger.warning("OCR 结果仅 %d 位（需 ≥%d 位）: %s，视为失败", len(text), min_length, text)
+            text = None
+
+        if text:
+            logger.info("验证码识别结果: %s", text)
+        return text
+
     def solve_captcha(self, captcha_selector: str, use_preprocess: bool = True,
                        min_length: int = 0) -> Optional[str]:
         """截图 → 预处理 → OCR → 返回文本。

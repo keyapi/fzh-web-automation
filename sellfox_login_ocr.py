@@ -4,6 +4,7 @@
 
 关键：验证码有时效，必须点击刷新后立刻识别+填入+登录。
 """
+import base64
 import logging
 import os
 import sys
@@ -63,16 +64,12 @@ def login(page) -> bool:
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
-    # 主循环：刷新 → 立刻 OCR → 填入 → 登录
+    # 主循环：刷新 → JS读dataURI → OCR → 填入 → 登录
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-        # 1. 点击刷新验证码（用 JS 定位 a[href="javascript:"] 点击）
+        # 1. 点击刷新验证码
         try:
-            # 先确认当前图片存在
-            old_src = page.evaluate(
-                "() => document.querySelector('img[src^=\"data:image/jpg\"]')?.src || ''"
-            )
             page.evaluate(
                 """() => {
                     const input = document.querySelector('input[placeholder*="图形验证码"]');
@@ -80,19 +77,33 @@ def login(page) -> bool:
                     if (link) link.click();
                 }"""
             )
-            # 等待新图片加载（src 变化）
-            page.wait_for_function(
-                f"""() => {{
-                    const img = document.querySelector('img[src^="data:image/jpg"]');
-                    return img && img.src !== '{old_src}' && img.naturalWidth > 0;
-                }}""",
-                timeout=5000,
-            )
+            page.wait_for_timeout(500)
         except Exception:
-            page.wait_for_timeout(800)  # fallback
+            pass
 
-        # 2. 立刻截图+OCR（至少4位字母数字）
-        text = ocr.solve_captcha(SELECTORS["captcha_img"], min_length=4)
+        # 2. JS 直接读 data URI → base64 decode → OCR（绕过截图 DOM 问题）
+        png = None
+        try:
+            b64 = page.evaluate(
+                """() => {
+                    const img = document.querySelector('img[src^="data:image/jpg"]');
+                    if (!img || !img.src) return null;
+                    const s = img.src;
+                    const i = s.indexOf(',');
+                    return i > 0 ? s.substring(i + 1) : null;
+                }"""
+            )
+            if b64:
+                png = base64.b64decode(b64)
+        except Exception:
+            pass
+
+        if not png:
+            logger.warning("获取验证码失败，重试...")
+            time.sleep(0.3)
+            continue
+
+        text = ocr.solve_captcha_from_bytes(png, min_length=4)
         if not text:
             logger.warning("OCR 失败，重试...")
             time.sleep(0.3)
