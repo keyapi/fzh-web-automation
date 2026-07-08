@@ -85,7 +85,19 @@ npm install -g @playwright/mcp
 5. **永不直接 push main**：任何改动必须走 `feature/xxx` 分支 → 提交 → PR → 审批后合并。
 6. **探索后立即更新文档**：MCP 探索有新发现 → 立即更新对应 `references/*.md`，不攒记忆负担。
 7. **uv 运行所有脚本**：`uv run python <script.py>`，`uv add <包名>` 加依赖。
-8. **OKF 文档规范**：所有 `.md` 文件必须有 YAML frontmatter（`type` 字段必填），每个目录必须有 `index.md`，每个 bundle 必须有 `log.md`。
+8. **OKF 文档规范**：所有 `.md` 文件必须有 YAML frontmatter（`type` 字段必填）。type 可选值: `Index` / `Reference` / `Log` / `Research` / `Spec` / `Lesson`。每个目录必须有 `index.md`，每个 bundle 必须有 `log.md`。新增模块/功能 → 必须创建对应 docs/ 文档。参考已有文件格式。
+9. **提交前扫描凭证**：push 前必须跑：
+   `git diff origin/main...HEAD | grep -iE "(api_key|api_secret|password|token)\s*=\s*['\"]?\w{8,}"`
+   必须有**零输出**。禁止硬编码密钥/token/密码。违反的 PR 不得合并。
+10. **Commit 格式**：中文 `type(scope): 描述`。类型: `feat`(新功能) / `fix`(修复) / `docs`(文档) / `refactor`(重构)。
+
+## 团队协作角色
+
+| 角色 | 怎么用 | 参考文档 |
+|------|--------|---------|
+| **A 类：非技术同事** | Agent 运行脚本 / Web UI，不直接写代码 | `docs/onboarding.md` |
+| **B 类：技术开发** | 分支开发 → PR → 审批 → merge | `CONTRIBUTING.md` |
+| **项目主** | 审批 PR，维护 main | 本文档 |
 
 ## 技术概览
 
@@ -104,19 +116,25 @@ npm install -g @playwright/mcp
 AGENTS.md (< 200 lines)              ← 你正在读的，项目总纲 + 路由地图
 ├── README.md                        ← 人读项目介绍
 ├── README_给同事.md                 ← 给同事的入口（→ docs/onboarding.md）
+├── CONTRIBUTING.md                  ← 技术开发贡献指南（B 类用户）
 ├── AGENT_HANDOFF.md                 ← Agent 交接文档（脚本清单、字段映射、边界条件）
 ├── docs/
 │   ├── index.md                     ← 文档导航
 │   ├── log.md                       ← 变更记录
 │   ├── onboarding.md                ← 非技术同事上手操作指南
 │   ├── reference/
-│   │   ├── tongtu-pitfalls.md       ← 通途 13 个踩坑记录
+│   │   ├── tongtu-pitfalls.md       ← 通途踩坑记录
 │   │   ├── sellfox-pitfalls.md      ← 赛狐踩坑 + 选择器文档
 │   │   ├── technical-decisions.md   ← 关键技术决策
-│   │   └── company-context.md       ← 公司背景、供应链、仓库映射
+│   │   ├── company-context.md       ← 公司背景、供应链、仓库映射
+│   │   ├── gitee-contribution-guide.md ← Gitee 贡献指南（非技术同事版）
+│   │   ├── gitee-to-github-merge.md ← Gitee→GitHub 合并 SOP（项目主用）
+│   │   └── tongtu-captcha-ocr.md    ← 通途 ddddocr 验证码识别方案
 │   └── lessons/
 │       ├── webfetch-fix.md          ← WebFetch 修复
 │       └── hooks-learning.md        ← Hooks 学习结论
+├── cdp-based/                       ← CDP 浏览器辅助脚本（WorkBuddy/CodeBuddy 环境）
+├── click-based/                     ← 旧版点击脚本（逐步淘汰）
 ├── .claude/skills/
 │   ├── tongtu-automation/           ← 通途 skill + references/
 │   └── sellfox-automation/          ← 赛狐 skill + references/
