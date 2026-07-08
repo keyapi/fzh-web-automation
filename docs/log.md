@@ -1,4 +1,4 @@
----
+﻿--- 
 okf: v0.1
 type: Log
 title: Changelog
@@ -9,14 +9,19 @@ timestamp: 2026-07-07
 
 ## 2026-07-08
 
-- **通途验证码自动识别（WX 贡献）**：
-  - 新增 `tongtu_export_ocr.py`：CDP 浏览器 + ddddocr 全自动登录导出（基于 wangxian-fzh 的 ddddocr-auto-login 分支）
-  - 新建 `cdp-based/` 目录：存放 CDP 浏览器相关的辅助脚本（`export_via_cdp.py`、`get_captcha.py`、`test_captcha_ocr.py`）
-  - 新增 `test_ocr.py`：独立 OCR 测试工具
-  - 新建 `docs/reference/tongtu-captcha-ocr.md`：ddddocr 方案文档 + onnxruntime 版本踩坑记录
-  - 新增依赖：dddddocr、Pillow、onnxruntime（>=1.20.1，Python 3.12 约束）
+- **Gitee 贡献流程文档**：
+  - 新建 `docs/reference/gitee-contribution-guide.md`（v1）：Fork 版贡献流程 + WorkBuddy 提示词模板
+  - 新建 `docs/reference/gitee-to-github-merge.md`：项目主 Gitee→GitHub 合并 SOP
+  - **v2 更新** `gitee-contribution-guide.md`：新增**协作者模式**（推荐）— 无需 Fork，Agent 通过 Gitee OpenAPI 自动创建 PR。仅需 1 步人工（注册 Gitee）+ keyapi 添加协作者，后续全由 Agent 接管
+  - 更新 `docs/index.md`、`docs/reference/index.md`
 
 ## 2026-07-07
+
+- **通途销售及库存报表自动导出**：
+  - 新建 `tongtu_sales_report.py`：自动提交统计任务 → 轮询等待完成 → 下载 zip
+  - 新建 `process_sales_report.py`：解压 zip → 按「仓库」列分表 → FZH-DANEEY 系列合并为一个工作表
+  - MCP 浏览器探路选择器（Node REPL 内置 Playwright），确认完整操作流后再写代码
+  - 新增坑 15-19 至 tongtu-pitfalls.md
 
 - **通途下载文件名中文乱码修复**：
   - Playwright download.suggested_filename GBK 编码→ mojibake，导致合并步骤静默跳过
