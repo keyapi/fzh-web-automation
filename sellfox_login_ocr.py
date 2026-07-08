@@ -68,7 +68,7 @@ def login(page) -> bool:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-        # 1. 点击刷新验证码
+        # 1. 点击刷新验证码 + 等新图出现
         try:
             page.evaluate(
                 """() => {
@@ -77,9 +77,10 @@ def login(page) -> bool:
                     if (link) link.click();
                 }"""
             )
-            page.wait_for_timeout(500)
-        except Exception:
-            pass
+            page.wait_for_selector('img[src^="data:image/jpg"]', state='attached', timeout=10000)
+            page.wait_for_timeout(300)
+        except Exception as e:
+            logger.warning("刷新验证码超时: %s", e)
 
         # 2. JS 直接读 data URI → base64 decode → OCR（绕过截图 DOM 问题）
         png = None
