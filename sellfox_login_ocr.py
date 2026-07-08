@@ -44,10 +44,9 @@ def login(page) -> bool:
     ocr.set_page(page)
 
     logger.info("导航到赛狐登录页...")
-    page.goto(LOGIN_URL, timeout=60000)
-    # 等 DOM 渲染完成（attached 不检查 CSS visibility，避免 Element UI 延迟）
+    # domcontentloaded: 只等 HTML 解析完成，不等第三方资源（bing/tracking/font）
+    page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector('#username', state='attached', timeout=15000)
-    # 再留给 JS 一点时间完成 Element UI 初始化
     page.wait_for_timeout(2000)
 
     # 勾选协议 + 自动登录
