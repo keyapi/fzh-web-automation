@@ -43,8 +43,10 @@ def login(page) -> bool:
     ocr.set_page(page)
 
     logger.info("导航到赛狐登录页...")
-    page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
-    page.wait_for_timeout(1500)
+    page.goto(LOGIN_URL, wait_until="commit", timeout=30000)
+    # 等待关键元素出现（比 networkidle/domcontentloaded 快）
+    page.wait_for_selector('#username', state='visible', timeout=30000)
+    page.wait_for_timeout(1000)
 
     # 勾选协议 + 自动登录
     try:
@@ -67,6 +69,10 @@ def login(page) -> bool:
 
         # 1. 点击刷新验证码（用 JS 定位 a[href="javascript:"] 点击）
         try:
+            # 先确认当前图片存在
+            old_src = page.evaluate(
+                "() => document.querySelector('img[src^=\"data:image/jpg\"]')?.src || ''"
+            )
             page.evaluate(
                 """() => {
                     const input = document.querySelector('input[placeholder*="图形验证码"]');
@@ -74,9 +80,16 @@ def login(page) -> bool:
                     if (link) link.click();
                 }"""
             )
+            # 等待新图片加载（src 变化）
+            page.wait_for_function(
+                f"""() => {{
+                    const img = document.querySelector('img[src^="data:image/jpg"]');
+                    return img && img.src !== '{old_src}' && img.naturalWidth > 0;
+                }}""",
+                timeout=5000,
+            )
         except Exception:
-            pass
-        page.wait_for_timeout(400)  # 等待新图片加载
+            page.wait_for_timeout(800)  # fallback
 
         # 2. 立刻截图+OCR（至少4位字母数字）
         text = ocr.solve_captcha(SELECTORS["captcha_img"], min_length=4)
