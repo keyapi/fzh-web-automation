@@ -30,7 +30,7 @@ SELECTORS = {
     "captcha_input": 'input[placeholder*="图形验证码"]',
     "login_btn": 'button:has-text("登录")',
     "auto_login_cb": 'text=5天内自动登录',
-    "agree_cb": 'text=阅读并接受',
+    "agree_cb": 'label.el-checkbox:has-text("阅读并接受")',            # 必须是 label 不是 span 文字
 }
 
 
@@ -65,11 +65,17 @@ def login(page) -> bool:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-        # 1. 点击刷新验证码
+        # 1. 点击刷新验证码（用 JS 定位 a[href="javascript:"] 点击）
         try:
-            page.locator(SELECTORS["captcha_refresh"]).click(timeout=3000)
+            page.evaluate(
+                """() => {
+                    const input = document.querySelector('input[placeholder*="图形验证码"]');
+                    const link = input?.closest('.el-input')?.parentElement?.querySelector('a[href="javascript:"]');
+                    if (link) link.click();
+                }"""
+            )
         except Exception:
-            pass  # 「点击刷新」可能还没出现
+            pass
         page.wait_for_timeout(400)  # 等待新图片加载
 
         # 2. 立刻截图+OCR
