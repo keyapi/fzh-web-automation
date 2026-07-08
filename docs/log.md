@@ -9,6 +9,10 @@ timestamp: 2026-07-07
 
 ## 2026-07-08
 
+- **AGENTS.md 规范补充 + OKF skill**：
+  - 从 fzh-data 借用 3 条规则：凭证扫描、commit 格式、团队角色表
+  - 新增 `.agents/skills/okf/SKILL.md`：OKF v0.1 完整规范（从 fzh-data 拷贝），Agent 新增模块前必读
+
 - **通途验证码自动识别（WX 贡献）**：
   - 新增 `tongtu_export_ocr.py`：CDP 浏览器 + ddddocr 全自动登录导出（基于 wangxian-fzh 的 ddddocr-auto-login 分支）
   - 新建 `cdp-based/` 目录：存放 CDP 浏览器相关的辅助脚本（`export_via_cdp.py`、`get_captcha.py`、`test_captcha_ocr.py`）

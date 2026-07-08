@@ -85,7 +85,7 @@ npm install -g @playwright/mcp
 5. **永不直接 push main**：任何改动必须走 `feature/xxx` 分支 → 提交 → PR → 审批后合并。
 6. **探索后立即更新文档**：MCP 探索有新发现 → 立即更新对应 `references/*.md`，不攒记忆负担。
 7. **uv 运行所有脚本**：`uv run python <script.py>`，`uv add <包名>` 加依赖。
-8. **OKF 文档规范**：所有 `.md` 文件必须有 YAML frontmatter（`type` 字段必填）。type 可选值: `Index` / `Reference` / `Log` / `Research` / `Spec` / `Lesson`。每个目录必须有 `index.md`，每个 bundle 必须有 `log.md`。新增模块/功能 → 必须创建对应 docs/ 文档。参考已有文件格式。
+8. **OKF 文档规范**：所有 `.md` 文件必须有 YAML frontmatter（`type` 字段必填）。新增模块/功能 → 必须先读 `.agents/skills/okf/SKILL.md` 了解完整规范，然后创建对应 docs/ 文档 + 更新 index.md + 更新 log.md。
 9. **提交前扫描凭证**：push 前必须跑：
    `git diff origin/main...HEAD | grep -iE "(api_key|api_secret|password|token)\s*=\s*['\"]?\w{8,}"`
    必须有**零输出**。禁止硬编码密钥/token/密码。违反的 PR 不得合并。
@@ -137,6 +137,7 @@ AGENTS.md (< 200 lines)              ← 你正在读的，项目总纲 + 路由
 ├── click-based/                     ← 旧版点击脚本（逐步淘汰）
 ├── .claude/skills/
 │   ├── tongtu-automation/           ← 通途 skill + references/
-│   └── sellfox-automation/          ← 赛狐 skill + references/
+│   ├── sellfox-automation/          ← 赛狐 skill + references/
+│   └── okf/                         ← OKF v0.1 文档规范（新增模块前必读）
 └── .mcp.json                        ← 项目级 Playwright MCP 配置
 ```
