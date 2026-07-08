@@ -6,6 +6,7 @@
   uv run python sellfox_auto_export.py            # 浏览器演示模式（可见点击）
   uv run python sellfox_auto_export.py --api       # API 模式（请求直接调 API）
   uv run python sellfox_auto_export.py --headless  # 浏览器无头模式（后台运行）
+  uv run python sellfox_auto_export.py --auto-login  # ddddocr 自动登录（首次/cookie过期）
   uv run python sellfox_auto_export.py --fresh     # 强制重新登录
   uv run python sellfox_auto_export.py --demo-search  # 演示搜索切换 (SKU/品名/精/模)
   uv run python sellfox_auto_export.py --export-cookies  # 导出 cookies 供 API 使用
@@ -254,7 +255,7 @@ def browser_export_flow(page):
     return None
 
 
-def run_browser(headless=False, demo_search=False):
+def run_browser(headless=False, demo_search=False, auto_login=False):
     """浏览器模式：先登录页 → 用户登录 → 仓库页 → 导出。MCP 实测流程。"""
     first_run = not PROFILE_DIR.exists()
     DOWNLOADS_DIR.mkdir(exist_ok=True)
@@ -281,6 +282,16 @@ def run_browser(headless=False, demo_search=False):
 
         if is_logged_in(page):
             print("[OK] 已登录，跳过登录步骤\n")
+        elif auto_login:
+            print("[信息] 尝试 ddddocr 自动登录...")
+            from sellfox_login_ocr import login as auto_login_fn
+            if not auto_login_fn(page):
+                print("[信息] 自动登录失败，切换到手动登录...")
+                if not wait_for_login(page):
+                    context.close()
+                    return False
+            else:
+                print("[OK] ddddocr 自动登录成功")
         else:
             print(f"[!] 未登录 (URL={page.url[:60]}) → 打开登录页")
             page.goto(LOGIN_URL, timeout=30000)
@@ -495,6 +506,7 @@ def main():
         return
 
     fresh = "--fresh" in args
+    auto_login = "--auto-login" in args
     use_api = "--api" in args
     headless = "--headless" in args
 
@@ -512,7 +524,7 @@ def main():
         mode = "无头" if headless else "演示"
         print(f"赛狐库存导出 — 浏览器{mode}模式")
         print("=" * 50)
-        success = run_browser(headless=headless)
+        success = run_browser(headless=headless, auto_login=auto_login)
 
     if success:
         print("\n完成！")
