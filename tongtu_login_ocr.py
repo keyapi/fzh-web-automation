@@ -45,8 +45,8 @@ def login(page) -> bool:
     ocr.set_page(page)
 
     logger.info("导航到通途登录页...")
-    page.goto(LOGIN_URL, wait_until="domcontentloaded")
-    page.wait_for_timeout(1000)
+    page.goto(LOGIN_URL, wait_until="networkidle", timeout=30000)
+    page.wait_for_timeout(1500)
 
     # 勾选"7天内自动登录"
     try:
