@@ -7,6 +7,13 @@ timestamp: 2026-07-07
 
 # Changelog
 
+## 2026-07-08
+
+- **Gitee 贡献流程文档**：
+  - 新建 `docs/reference/gitee-contribution-guide.md`：非技术同事通过 Gitee 贡献代码的完整指南（注册 → Fork → PR），含 WorkBuddy Agent 提示词模板
+  - 新建 `docs/reference/gitee-to-github-merge.md`：项目主将 Gitee PR 手动合并回 GitHub 的 SOP
+  - 更新 `docs/index.md`、`docs/reference/index.md`
+
 ## 2026-07-07
 
 - **通途销售及库存报表自动导出**：
