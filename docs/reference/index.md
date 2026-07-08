@@ -14,3 +14,4 @@ timestamp: 2026-07-07
 | [technical-decisions.md](technical-decisions.md) | 关键技术决策（uv/Playwright/MCP/Cookie 桥接） |
 | [tongtu-pitfalls.md](tongtu-pitfalls.md) | 通途 14 个踩坑（现象→根因→解决） |
 | [sellfox-pitfalls.md](sellfox-pitfalls.md) | 赛狐踩坑 + Element UI 选择器参考 |
+| [tongtu-captcha-ocr.md](tongtu-captcha-ocr.md) | 通途验证码自动识别 — ddddocr 方案（CDP 路径） |

@@ -19,4 +19,5 @@ timestamp: 2026-06-30
 | 非技术同事上手操作 | [onboarding.md](onboarding.md) |
 | 通途自动化入门 | [../.agents/skills/tongtu-automation/SKILL.md](../.agents/skills/tongtu-automation/SKILL.md) |
 | 赛狐自动化入门 | [../.agents/skills/sellfox-automation/SKILL.md](../.agents/skills/sellfox-automation/SKILL.md) |
+| 通途验证码自动识别 (ddddocr) | [tongtu-captcha-ocr.md](reference/tongtu-captcha-ocr.md) |
 | 变更记录 | [log.md](log.md) |

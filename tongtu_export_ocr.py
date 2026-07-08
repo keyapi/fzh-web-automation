@@ -19,8 +19,16 @@ COMPUTER_TOOL = "/root/.codebuddy/skills/computer-use/scripts/computer_tool.py"
 TONGTU_LOGIN = "https://passport.tongtool.com/?u=http%3A%2F%2Ferp102.tongtool.com%2Fj_security_check"
 INVENTORY_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?warehouse=1&isFirstInto=1"
 
-USERNAME = "wangxian@vilavidress.com"
-PASSWORD = "wang30724588!"
+import os
+
+USERNAME = os.getenv("TONGTU_USER", "")
+PASSWORD = os.getenv("TONGTU_PASSWORD", "")
+
+if not USERNAME or not PASSWORD:
+    print("错误: 请设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD")
+    print("  方式1: 在 .env 文件中设置，然后运行脚本")
+    print("  方式2: PowerShell: $env:TONGTU_USER='user'; $env:TONGTU_PASSWORD='pass'")
+    sys.exit(1)
 
 WAREHOUSES = [
     "CENTRADE",

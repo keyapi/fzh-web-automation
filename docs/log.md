@@ -7,6 +7,15 @@ timestamp: 2026-07-07
 
 # Changelog
 
+## 2026-07-08
+
+- **通途验证码自动识别（WX 贡献）**：
+  - 新增 `tongtu_export_ocr.py`：CDP 浏览器 + ddddocr 全自动登录导出（基于 wangxian-fzh 的 ddddocr-auto-login 分支）
+  - 新建 `cdp-based/` 目录：存放 CDP 浏览器相关的辅助脚本（`export_via_cdp.py`、`get_captcha.py`、`test_captcha_ocr.py`）
+  - 新增 `test_ocr.py`：独立 OCR 测试工具
+  - 新建 `docs/reference/tongtu-captcha-ocr.md`：ddddocr 方案文档 + onnxruntime 版本踩坑记录
+  - 新增依赖：dddddocr、Pillow、onnxruntime（>=1.20.1，Python 3.12 约束）
+
 ## 2026-07-07
 
 - **通途下载文件名中文乱码修复**：
