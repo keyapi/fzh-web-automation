@@ -9,4 +9,10 @@ dependencies = [
     "playwright>=1.40",
     "requests>=2.32.5",
     "requests-toolbelt>=1.0.0",
+    "ddddocr>=1.5.6",
+    "pillow>=11.3.0",
+    # onnxruntime: Python 3.12 下最低 1.20.1（1.16.3 无 cp312 wheel）。
+    # fzh-data 在 Python 3.10 下钉死 1.16.3+numpy<2，因 1.23.x Windows DLL 加载失败。
+    # 若 Windows 上报 DLL load failed，尝试降到 1.18.x（最早支持 cp312）。
+    "onnxruntime>=1.20.1",
 ]
