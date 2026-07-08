@@ -64,25 +64,27 @@ def login(page) -> bool:
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
-    # 主循环：刷新 → JS读dataURI → OCR → 填入 → 登录
+    # 主循环：读图 → OCR → 填入 → 登录（失败后页面自动刷新验证码，不需要手动点刷新）
     for attempt in range(1, MAX_ATTEMPTS + 1):
         logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
 
-        # 1. 点击刷新验证码 + 等新图出现
-        try:
-            page.evaluate(
-                """() => {
-                    const input = document.querySelector('input[placeholder*="图形验证码"]');
-                    const link = input?.closest('.el-input')?.parentElement?.querySelector('a[href="javascript:"]');
-                    if (link) link.click();
-                }"""
-            )
-            page.wait_for_selector('img[src^="data:image/jpg"]', state='attached', timeout=10000)
-            page.wait_for_timeout(300)
-        except Exception as e:
-            logger.warning("刷新验证码超时: %s", e)
+        # 仅在首次或显式需要时点击刷新
+        if attempt == 1 or not page.query_selector('img[src^="data:image/jpg"]'):
+            try:
+                page.evaluate(
+                    """() => {
+                        const input = document.querySelector('input[placeholder*="图形验证码"]');
+                        const link = input?.closest('.el-input')?.parentElement?.querySelector('a[href="javascript:"]');
+                        if (link) link.click();
+                    }"""
+                )
+                page.wait_for_selector('img[src^="data:image/jpg"]', state='attached', timeout=10000)
+                page.wait_for_timeout(300)
+            except Exception as e:
+                logger.warning("刷新验证码超时: %s", e)
+                continue
 
-        # 2. JS 直接读 data URI → base64 decode → OCR（绕过截图 DOM 问题）
+        # 读图 → OCR（至少4位）
         png = None
         try:
             b64 = page.evaluate(
@@ -110,7 +112,7 @@ def login(page) -> bool:
             time.sleep(0.3)
             continue
 
-        # 3. 填入验证码
+        # 填入验证码
         try:
             page.locator(SELECTORS["captcha_input"]).first.fill(text)
         except Exception as e:
@@ -118,7 +120,7 @@ def login(page) -> bool:
             time.sleep(0.3)
             continue
 
-        # 4. 点击登录
+        # 点击登录
         try:
             page.locator(SELECTORS["login_btn"]).first.click()
         except Exception as e:
@@ -126,7 +128,7 @@ def login(page) -> bool:
             time.sleep(0.3)
             continue
 
-        # 5. 等待结果
+        # 等待结果
         page.wait_for_timeout(2000)
         url = page.url or ""
         if SUCCESS_FRAGMENT in url:
