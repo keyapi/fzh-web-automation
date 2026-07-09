@@ -31,7 +31,7 @@ SELECTORS = {
     "captcha_input": 'input[placeholder*="图形验证码"]',
     "login_btn": 'button:has-text("登录")',
     "auto_login_cb": 'text=5天内自动登录',
-    "agree_cb": 'label.el-checkbox:has-text("阅读并接受")',            # 必须是 label 不是 span 文字
+    "agree_cb": 'label.el-checkbox:has-text("阅读并接受") span.el-checkbox__inner',
 }
 
 
@@ -56,18 +56,9 @@ def login(page) -> bool:
     except Exception as e:
         logger.warning("勾选自动登录失败: %s", e)
     try:
-        page.evaluate(
-            """() => {
-                const labels = document.querySelectorAll('.el-checkbox');
-                for (const el of labels) {
-                    if (el.textContent.includes('阅读并接受') && !el.classList.contains('is-checked')) {
-                        const inner = el.querySelector('.el-checkbox__inner');
-                        if (inner) { inner.click(); break; }
-                    }
-                }
-            }"""
-        )
-        page.wait_for_timeout(300)
+        ocr.ensure_checkbox(SELECTORS["agree_cb"], "阅读并接受协议")
+    except Exception as e:
+        logger.warning("勾选协议失败: %s", e)
     except Exception as e:
         logger.warning("勾选协议失败: %s", e)
 
