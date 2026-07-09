@@ -22,6 +22,8 @@ timestamp: 2026-07-07
   - `tongtu-automation/SKILL.md`：快速运行默认加 `--auto-login`，新增 Agent 执行规则（禁止不加 flag）
   - `sellfox-automation/SKILL.md`：登录流程改为 `--auto-login` 自动登录，新增 Agent 执行规则
   - `tongtu_sales_report.py`：新增 `--auto-login` 支持（复用 `tongtu_login_ocr`）
+  - ImportError fallback：3 个主脚本 ddddocr 未安装时自动降级为人工登录，不崩溃
+  - Cookie 目录统一：`tongtu_login_ocr.py` / `sellfox_login_ocr.py` 独立模式改用 `chrome-profile` / `sellfox-profile`，与主脚本共享
   - 用户说"导出库存"时 Agent 自动带 `--auto-login`，有 cookie 跳过，无 cookie 时 ddddocr 识别验证码
 
 - **Playwright + ddddocr 自动登录踩坑文档增强**：

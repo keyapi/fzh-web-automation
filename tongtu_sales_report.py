@@ -208,15 +208,23 @@ def run(first_run=False, auto_login=False):
             print("[OK] 检测到已登录会话，自动继续...")
         elif auto_login:
             print("[信息] 尝试 ddddocr 自动登录...")
-            from tongtu_login_ocr import login as auto_login_fn
-            if not auto_login_fn(page):
-                print("[信息] 自动登录失败，切换到手动登录...")
+            try:
+                from tongtu_login_ocr import login as auto_login_fn
+                if auto_login_fn(page):
+                    print("[OK] ddddocr 自动登录成功")
+                else:
+                    print("[信息] 自动登录失败，切换到手动登录...")
+                    if not wait_for_login(page):
+                        print("[错误] 登录超时，请重试")
+                        context.close()
+                        sys.exit(1)
+            except ImportError:
+                print("[信息] ddddocr 未安装，切换到手动登录...")
+                print("[提示] 安装后可自动登录: uv add ddddocr onnxruntime")
                 if not wait_for_login(page):
                     print("[错误] 登录超时，请重试")
                     context.close()
                     sys.exit(1)
-            else:
-                print("[OK] ddddocr 自动登录成功")
         else:
             if not first_run:
                 print("[信息] 登录会话已过期，请重新登录")

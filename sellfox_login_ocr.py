@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
-            user_data_dir="sellfox-profile-login",
+            user_data_dir="sellfox-profile",  # 与 sellfox_auto_export.py 共享 cookie
             headless=False,
             viewport={"width": 1280, "height": 800},
             args=["--disable-blink-features=AutomationControlled"],
