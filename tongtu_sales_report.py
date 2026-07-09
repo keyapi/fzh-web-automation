@@ -2,6 +2,12 @@
 """
 通途销售及库存报表自动导出 + 按仓分表处理
 
+用法:
+  uv run python tongtu_sales_report.py                  # 日常导出（依赖 chrome-profile cookie）
+  uv run python tongtu_sales_report.py --auto-login      # ddddocr 自动登录（首次/cookie过期）
+  uv run python tongtu_sales_report.py --fresh            # 强制重新登录
+  uv run python tongtu_sales_report.py --fresh --auto-login  # 清除旧 cookie + 自动登录
+
 流程:
   1. 自动导出「销售及库存报表」统计结果 zip
   2. 解压 → 读取 xlsx（表头 Row 12）→ 按「仓库」列分表
@@ -178,7 +184,7 @@ def run_process(zip_path):
         print(result.stderr)
 
 
-def run(first_run=False):
+def run(first_run=False, auto_login=False):
     """主入口"""
     print("=" * 50)
     print("[通途] 销售及库存报表自动导出 + 按仓分表")
@@ -200,6 +206,17 @@ def run(first_run=False):
 
         if is_logged_in(page):
             print("[OK] 检测到已登录会话，自动继续...")
+        elif auto_login:
+            print("[信息] 尝试 ddddocr 自动登录...")
+            from tongtu_login_ocr import login as auto_login_fn
+            if not auto_login_fn(page):
+                print("[信息] 自动登录失败，切换到手动登录...")
+                if not wait_for_login(page):
+                    print("[错误] 登录超时，请重试")
+                    context.close()
+                    sys.exit(1)
+            else:
+                print("[OK] ddddocr 自动登录成功")
         else:
             if not first_run:
                 print("[信息] 登录会话已过期，请重新登录")
@@ -245,4 +262,8 @@ def run(first_run=False):
 
 if __name__ == "__main__":
     fresh = "--fresh" in sys.argv
-    run(first_run=fresh)
+    auto_login = "--auto-login" in sys.argv
+    if fresh and PROFILE_DIR.exists():
+        print("[信息] --fresh: 清除旧的登录会话...")
+        shutil.rmtree(PROFILE_DIR)
+    run(first_run=fresh, auto_login=auto_login)
