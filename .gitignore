@@ -47,3 +47,11 @@ sellfox_cookies.json
 
 # Browser persistent profiles (cookies, localStorage)
 sellfox-profile/
+chrome-profile-test/
+sfx-test*
+sfx-debug*
+sfx-fresh*
+sfx-login-test*
+sfx-t*
+sellfox-profile-login/
+tongtu-profile-login/
