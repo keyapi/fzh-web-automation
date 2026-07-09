@@ -9,6 +9,24 @@ timestamp: 2026-07-07
 
 ## 2026-07-09
 
+- **ddddocr 自动登录全修复验证**：
+  - `tongtu_login_ocr.py` 重写：HTTP 下载原始 JPG → ddddocr（匹配 CDP 方案），直连循环替代 login_loop
+  - `sellfox_login_ocr.py` 7 处修复：语法错误、SUCCESS_FRAGMENT、agree checkbox 简化、captcha 刷新、URL 轮询
+  - `ddddocr_login.py` `_checkbox_looks_checked` 增强：原生 checkbox + 祖先 label 检测
+  - 两个脚本均独立验证：通途 22s 一次成功、赛狐 15s 一次成功、无 Target crashed
+  - 新建 `docs/solutions/integration-issues/ddddocr-playwright-login-fixes.md`
+  - 更新 `docs/lessons/ddddocr-login-pitfalls.md` 验证状态 → ✅
+  - 更新 `AGENT_HANDOFF.md` 第 8 节状态
+
+- **Skill 自动登录规则更新**：
+  - `tongtu-automation/SKILL.md`：快速运行默认加 `--auto-login`，新增 Agent 执行规则（禁止不加 flag）
+  - `sellfox-automation/SKILL.md`：登录流程改为 `--auto-login` 自动登录，新增 Agent 执行规则
+  - `tongtu_sales_report.py`：新增 `--auto-login` 支持（复用 `tongtu_login_ocr`）
+  - ImportError fallback：3 个主脚本 ddddocr 未安装时自动降级为人工登录，不崩溃
+  - Cookie 目录统一：`tongtu_login_ocr.py` / `sellfox_login_ocr.py` 独立模式改用 `chrome-profile` / `sellfox-profile`，与主脚本共享
+  - 新建 `docs/reference/ddddocr-setup.md`：ddddocr + onnxruntime 安装指南（各平台踩坑、版本矩阵、降级策略）
+  - 用户说"导出库存"时 Agent 自动带 `--auto-login`，有 cookie 跳过，无 cookie 时 ddddocr 识别验证码
+
 - **Playwright + ddddocr 自动登录踩坑文档增强**：
   - ce-compound 增强 `docs/lessons/ddddocr-login-pitfalls.md`：新增诊断陷阱说明、GitHub issue 引用、last_updated
   - 更新 `AGENT_HANDOFF.md`：新增 ddddocr login 脚本清单 + 踩坑速查

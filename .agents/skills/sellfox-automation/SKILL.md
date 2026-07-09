@@ -92,8 +92,15 @@ context = p.chromium.launch_persistent_context(
     headless=False,
 )
 ```
-- 首次：手动登录 → cookies 自动保存 → **下次免登录**
-- 过期：`--fresh` 强制删除 profile 重新登录
+- **自动登录**: 有 cookie → 直接用；无 cookie → 加 `--auto-login` 触发 ddddocr 验证码识别（~15s）
+- 过期：`--fresh --auto-login` 强制删除 profile + 自动重新登录
+
+### Agent 执行规则
+当用户说"导出赛狐库存"/"赛狐导出"等时，Agent 必须：
+1. **默认加 `--auto-login`** — 有 cookie 自动跳过，无 cookie 时 ddddocr 识别验证码
+2. 用户说"重新登录" → 加 `--fresh --auto-login`
+3. ddddocr 未安装时自动降级为人工登录（弹出浏览器等待手动操作），不会崩溃
+4. Cookie 持久化到 `sellfox-profile/`，脚本间共享
 
 ### 登录检测（双重判定）
 赛狐登录后跳转到 **dashboard**（不是库存页）。检测需两种方式：

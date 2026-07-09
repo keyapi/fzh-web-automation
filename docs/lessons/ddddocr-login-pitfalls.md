@@ -135,10 +135,12 @@ text = ocr.solve_captcha_from_bytes(png, min_length=4)
 
 | 项目 | MCP 浏览器 | Python 脚本 |
 |------|-----------|------------|
-| 通途登录 | ✅ 成功 | ⚠️ 未独立测试（逻辑与 MCP 一致） |
-| 赛狐登录 | ✅ 成功 | ⚠️ 待最终验证（agree checkbox `el-checkbox__inner` 修复后） |
+| 通途登录 | ✅ 成功 | ✅ **已验证** (22s, 第1次成功, 2026-07-09) |
+| 赛狐登录 | ✅ 成功 | ✅ **已验证** (15s, 第1次成功, 无 Target crashed, 2026-07-09) |
 | ddddocr 识别 | ✅ 两者均可用 | ✅ `test_ocr.py` 通过 |
 | 页面加载速度 | ✅ 秒开 | ✅ `wait_until="commit"` 后 0.2s |
+
+> **2026-07-09 更新**: 两个脚本均已独立验证登录成功。修复详见 [docs/solutions/integration-issues/ddddocr-playwright-login-fixes.md](../solutions/integration-issues/ddddocr-playwright-login-fixes.md)。
 
 ## 关键文件
 

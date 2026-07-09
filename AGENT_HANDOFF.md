@@ -12,6 +12,7 @@ FZH 跨境电商浏览器自动化工具集，Playwright 驱动通途 / 赛狐 E
 | 脚本 | 功能 | 平台 |
 |------|------|------|
 | `tongtu_auto_export.py` | 6 仓库存结存导出 + 导入文件生成 | 通途 |
+| `tongtu_sales_report.py` | 销售及库存报表导出 + 按仓分表 | 通途 |
 | `generate_tongtu_import.py` | 库存清单 → 5 列导入模板 | 通途 |
 | `merge_inventory.py` | 多仓原始清单合并 | 通途 |
 | `inspect_warehouse.py` | DOM 诊断 dump | 通途 |
@@ -125,12 +126,27 @@ FZH 跨境电商浏览器自动化工具集，Playwright 驱动通途 / 赛狐 E
 ## 8. ddddocr 自动登录（新）
 
 ```bash
-# 通途（需设环境变量）
+# 通途库存结存导出（需设环境变量）
 TONGTU_USER=xxx TONGTU_PASSWORD=xxx uv run python tongtu_auto_export.py --auto-login --fresh
+
+# 通途销售及库存报表导出（需设环境变量）
+TONGTU_USER=xxx TONGTU_PASSWORD=xxx uv run python tongtu_sales_report.py --auto-login --fresh
 
 # 赛狐（需设环境变量）
 SELLFOX_USER=xxx SELLFOX_PASSWORD=xxx uv run python sellfox_auto_export.py --auto-login --fresh
 ```
+
+### 通用性
+
+`tongtu_login_ocr.py` / `sellfox_login_ocr.py` 是独立的登录适配器，任何通途/赛狐脚本只需 import 即可复用：
+
+```python
+from tongtu_login_ocr import login as auto_login_fn
+if not is_logged_in(page):
+    auto_login_fn(page)
+```
+
+已接入 `--auto-login` 的脚本：`tongtu_auto_export.py`、`tongtu_sales_report.py`、`sellfox_auto_export.py`。
 
 ### 架构
 
@@ -143,16 +159,17 @@ ddddocr_login.py       ← 共享 OCR 引擎
   sellfox_auto_export.py --auto-login
 ```
 
-### 当前状态（2026-07-09）
+### 当前状态（2026-07-09 更新）
 
 | 平台 | MCP 浏览器 | Python 脚本 | 备注 |
 |------|-----------|------------|------|
-| 通途 | ✅ 成功 | ⚠️ 待测 | 无 agree checkbox，理论上直接通 |
-| 赛狐 | ✅ 成功 | ⚠️ 待测 | agree checkbox `el-checkbox__inner` 修复待验证 |
+| 通途 | ✅ 成功 | ✅ **已验证** | 22s 第1次成功，HTTP 下载原始 JPG + 无预处理 |
+| 赛狐 | ✅ 成功 | ✅ **已验证** | 15s 第1次成功，agree `el-checkbox__inner` 无崩溃 |
 
 ### 关键文件
 
-- `docs/lessons/ddddocr-login-pitfalls.md` — 6 个踩坑 + GitHub issue 引用
+- `docs/solutions/integration-issues/ddddocr-playwright-login-fixes.md` — **修复记录**（根因+方案+验证）
+- `docs/lessons/ddddocr-login-pitfalls.md` — 6 个踩坑 + GitHub issue 引用（已标记验证通过）
 - `docs/reference/tongtu-captcha-ocr.md` — ddddocr CDP 方案（WX 贡献）
 - `cdp-based/` — WX 的 WorkBuddy CDP 脚本（保留）
 - PR #11 — `feature/ddddocr-playwright-login`

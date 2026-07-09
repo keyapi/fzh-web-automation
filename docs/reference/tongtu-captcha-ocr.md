@@ -72,5 +72,6 @@ uv run python tongtu_export_ocr.py
 
 ## 参考
 
+- [ddddocr-setup.md](ddddocr-setup.md) — ddddocr + onnxruntime 安装指南（各平台踩坑）
 - [ddddocr GitHub](https://github.com/sml2h3/ddddocr)
 - [fzh-data SPS_Selenium_Local/sellfox_login.py](https://github.com/keyapi/fzh-data)——赛狐版 ddddocr 登录（Selenium 路径）

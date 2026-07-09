@@ -55,3 +55,6 @@ sfx-login-test*
 sfx-t*
 sellfox-profile-login/
 tongtu-profile-login/
+
+# Environment variables (contains credentials)
+.env

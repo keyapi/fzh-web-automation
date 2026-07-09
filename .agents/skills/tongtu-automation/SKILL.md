@@ -4,17 +4,18 @@ description: >
   操控通途 ERP (erp102.tongtool.com) 的库存结存导出、仓库切换、数据转换。
   当用户提到"通途"、"Tongtu"、"tongtool"、"库存结存"、"头程运费"、
   "6个仓库"、"CENTRADE"、"exportExcelPage"、"togglebutton"、
-  "导出库存"、"仓库导出"、"chrome-profile"等时触发。
+  "导出库存"、"仓库导出"、"chrome-profile"、"自动登录"、"ddddocr"等时触发。
   不要用于赛狐 (Sellfox) — 那是另一个独立系统 (见 sellfox-automation skill)。
 compatibility: >
-  需要 Python Playwright (sync_api) 及 openpyxl/pandas。
+  需要 Python Playwright (sync_api) 及 openpyxl/pandas, requests, ddddocr。
   持久化会话依赖 `chrome-profile/` 目录（gitignored）。
 metadata:
   platform: Tongtu ERP (ExtJS)
   python_script: tongtu_auto_export.py
+  auto_login_script: tongtu_login_ocr.py
   profile_dir: chrome-profile/
   warehouses: 6
-  updated: 2026-05-19
+  updated: 2026-07-09
 ---
 
 # 通途 ERP 库存自动化
@@ -32,7 +33,8 @@ metadata:
 | 合并已导出的清单 | "**通途合并库存**" |
 | 查看当前仓库有哪些 | "**通途有哪些仓库**" |
 
-> 首次运行需要手动登录一次（浏览器会弹出），之后免登录。
+> **自动登录**: 首次运行或无 cookie 时，Agent 会自动加 `--auto-login` 触发 ddddocr 验证码识别（~22s）。之后 cookie 持久化到 `chrome-profile/`，下次免登录。
+> **ddddocr 未安装时**: 自动降级为人工登录（打开浏览器等待手动操作），不会报错退出。安装: `uv add ddddocr onnxruntime`。
 
 ## Hard Constraints
 
@@ -54,10 +56,11 @@ metadata:
 
 ```bash
 # 日常导出（6 仓库依次导出 + 生成导入文件 + 合并）
-uv run python tongtu_auto_export.py
+#  有 cookie → 直接用；无 cookie → 自动 ddddocr 登录
+uv run python tongtu_auto_export.py --auto-login
 
-# 强制重新登录（登录过期时用）
-uv run python tongtu_auto_export.py --fresh
+# 强制重新登录（清除旧 cookie + ddddocr 自动登录）
+uv run python tongtu_auto_export.py --fresh --auto-login
 
 # 导出 cookie 给 MCP 注入
 uv run python tongtu_auto_export.py --export-cookies
@@ -65,6 +68,14 @@ uv run python tongtu_auto_export.py --export-cookies
 # MCP 下载后整理文件
 uv run python mcp_to_output.py --auto
 ```
+
+### Agent 执行规则
+
+当用户说"导出通途库存"/"通途导出"等时，Agent 必须：
+1. **默认加 `--auto-login`** — 有 cookie 自动跳过，无 cookie 时 ddddocr 识别验证码
+2. 用户说"重新登录"或"强制登录" → 加 `--fresh --auto-login`
+3. ddddocr 未安装时自动降级为人工登录（弹出浏览器等待手动操作），不会崩溃
+4. Cookie 持久化到 `chrome-profile/`，脚本间共享（`tongtu_auto_export.py`、`tongtu_sales_report.py`、`tongtu_login_ocr.py` 使用同一目录）
 
 ## 核心操作流程
 

@@ -284,14 +284,21 @@ def run_browser(headless=False, demo_search=False, auto_login=False):
             print("[OK] 已登录，跳过登录步骤\n")
         elif auto_login:
             print("[信息] 尝试 ddddocr 自动登录...")
-            from sellfox_login_ocr import login as auto_login_fn
-            if not auto_login_fn(page):
-                print("[信息] 自动登录失败，切换到手动登录...")
+            try:
+                from sellfox_login_ocr import login as auto_login_fn
+                if auto_login_fn(page):
+                    print("[OK] ddddocr 自动登录成功")
+                else:
+                    print("[信息] 自动登录失败，切换到手动登录...")
+                    if not wait_for_login(page):
+                        context.close()
+                        return False
+            except ImportError:
+                print("[信息] ddddocr 未安装，切换到手动登录...")
+                print("[提示] 安装后可自动登录: uv add ddddocr onnxruntime")
                 if not wait_for_login(page):
                     context.close()
                     return False
-            else:
-                print("[OK] ddddocr 自动登录成功")
         else:
             print(f"[!] 未登录 (URL={page.url[:60]}) → 打开登录页")
             page.goto(LOGIN_URL, timeout=30000)

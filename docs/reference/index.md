@@ -16,3 +16,5 @@ timestamp: 2026-07-07
 | [sellfox-pitfalls.md](sellfox-pitfalls.md) | 赛狐踩坑 + Element UI 选择器参考 |
 | [gitee-contribution-guide.md](gitee-contribution-guide.md) | Gitee 贡献指南（非技术同事版）— WorkBuddy 提示词模板 |
 | [gitee-to-github-merge.md](gitee-to-github-merge.md) | Gitee→GitHub 合并 SOP（项目主用） |
+| [tongtu-captcha-ocr.md](tongtu-captcha-ocr.md) | ddddocr 验证码自动识别方案（WX 贡献） |
+| [ddddocr-setup.md](ddddocr-setup.md) | ddddocr + onnxruntime 安装指南（各平台踩坑） |

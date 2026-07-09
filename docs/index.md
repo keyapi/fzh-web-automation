@@ -21,4 +21,6 @@ timestamp: 2026-06-30
 | 赛狐自动化入门 | [../.agents/skills/sellfox-automation/SKILL.md](../.agents/skills/sellfox-automation/SKILL.md) |
 | 通过 Gitee 贡献代码（非技术同事） | [gitee-contribution-guide.md](reference/gitee-contribution-guide.md) |
 | Gitee→GitHub 合并操作（项目主） | [gitee-to-github-merge.md](reference/gitee-to-github-merge.md) |
+| ddddocr + onnxruntime 安装 | [ddddocr-setup.md](reference/ddddocr-setup.md) |
 | 变更记录 | [log.md](log.md) |
+| 已解决问题 | [solutions/index.md](solutions/index.md) |
