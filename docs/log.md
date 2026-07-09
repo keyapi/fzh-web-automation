@@ -7,7 +7,23 @@ timestamp: 2026-07-07
 
 # Changelog
 
+## 2026-07-09
+
+- **Playwright + ddddocr 自动登录踩坑文档增强**：
+  - ce-compound 增强 `docs/lessons/ddddocr-login-pitfalls.md`：新增诊断陷阱说明、GitHub issue 引用、last_updated
+  - 更新 `AGENT_HANDOFF.md`：新增 ddddocr login 脚本清单 + 踩坑速查
+
 ## 2026-07-08
+
+- **Playwright + ddddocr 自动登录（通途 + 赛狐）**：
+  - 新建 `ddddocr_login.py`：共享 OCR 引擎（惰性加载、熔断、预处理、solve_captcha_from_bytes）
+  - 新建 `tongtu_login_ocr.py`：通途登录适配器
+  - 新建 `sellfox_login_ocr.py`：赛狐登录适配器
+  - 修改 `tongtu_auto_export.py`、`sellfox_auto_export.py`：+ `--auto-login` 标志
+  - 新建 `docs/lessons/ddddocr-login-pitfalls.md`：6 个踩坑汇总
+  - 新建 `docs/reference/tongtu-captcha-ocr.md`：ddddocr 方案文档（WX 贡献）
+  - 从 fzh-data 拷贝 `.agents/skills/okf/SKILL.md`
+  - AGENTS.md 补充 3 条规则（凭证扫描、OKF 详解、commit 格式）+ 团队角色表
 
 - **Gitee 贡献流程文档**：
   - 新建 `docs/reference/gitee-contribution-guide.md`（v1）：Fork 版贡献流程 + WorkBuddy 提示词模板
