@@ -97,8 +97,7 @@ def login(page) -> bool:
     except Exception as e:
         logger.warning("勾选自动登录失败: %s，继续...", e)
 
-    # 填入账号密码（只填一次）
-    logger.info("填入账号密码...")
+    # 填入账号密码（每次尝试前都重新填，因为通途失败会清空密码框）
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
@@ -107,6 +106,9 @@ def login(page) -> bool:
 
         # 刷新验证码（点击图片触发 changeCaptcha()）
         if attempt > 1:
+            # 通途失败后密码框会被清空，每次重试前重新填入
+            ocr.fill_field(SELECTORS["username"], USERNAME)
+            ocr.fill_field(SELECTORS["password"], PASSWORD)
             try:
                 page.locator(SELECTORS["captcha_img"]).first.click()
                 page.wait_for_timeout(600)
