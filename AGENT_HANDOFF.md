@@ -143,16 +143,17 @@ ddddocr_login.py       ← 共享 OCR 引擎
   sellfox_auto_export.py --auto-login
 ```
 
-### 当前状态（2026-07-09）
+### 当前状态（2026-07-09 更新）
 
 | 平台 | MCP 浏览器 | Python 脚本 | 备注 |
 |------|-----------|------------|------|
-| 通途 | ✅ 成功 | ⚠️ 待测 | 无 agree checkbox，理论上直接通 |
-| 赛狐 | ✅ 成功 | ⚠️ 待测 | agree checkbox `el-checkbox__inner` 修复待验证 |
+| 通途 | ✅ 成功 | ✅ **已验证** | 22s 第1次成功，HTTP 下载原始 JPG + 无预处理 |
+| 赛狐 | ✅ 成功 | ✅ **已验证** | 15s 第1次成功，agree `el-checkbox__inner` 无崩溃 |
 
 ### 关键文件
 
-- `docs/lessons/ddddocr-login-pitfalls.md` — 6 个踩坑 + GitHub issue 引用
+- `docs/solutions/integration-issues/ddddocr-playwright-login-fixes.md` — **修复记录**（根因+方案+验证）
+- `docs/lessons/ddddocr-login-pitfalls.md` — 6 个踩坑 + GitHub issue 引用（已标记验证通过）
 - `docs/reference/tongtu-captcha-ocr.md` — ddddocr CDP 方案（WX 贡献）
 - `cdp-based/` — WX 的 WorkBuddy CDP 脚本（保留）
 - PR #11 — `feature/ddddocr-playwright-login`

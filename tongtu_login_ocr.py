@@ -1,73 +1,159 @@
 #!/usr/bin/env python3
 """
 通途登录 — ddddocr 自动识别验证码 + Playwright
+匹配 WX CDP 方案：HTTP 下载原始 JPG → ddddocr（不做预处理）
 """
 import logging
 import os
 import sys
+import time
 
+import requests
 from ddddocr_login import DdddocrLogin
+
+sys.stdout.reconfigure(encoding='utf-8')
 
 logger = logging.getLogger(__name__)
 
-# ── 配置 ──
 LOGIN_URL = (
     "https://passport.tongtool.com/"
     "?u=http%3A%2F%2Ferp102.tongtool.com%2Fj_security_check"
 )
 SUCCESS_FRAGMENT = "erp102"
 EXCLUDE_FRAGMENT = "passport"
+MAX_ATTEMPTS = 8
 
 USERNAME = os.getenv("TONGTU_USER", "")
 PASSWORD = os.getenv("TONGTU_PASSWORD", "")
 
-# ── 选择器（2026-07 通途 passport 登录页，已 MCP 探路确认）──
 SELECTORS = {
     "username": 'input[name="username"]',
     "password": 'input[name="password"]',
     "captcha_img": 'img[alt="验证码"]',
     "captcha_input": 'input[name="captcha"]',
     "login_btn": 'button:has-text("立即登录")',
-    "auto_login_cb": 'input[type="checkbox"]',  # "7天内自动登录"
+    "auto_login_cb": 'input[type="checkbox"]',
 }
 
 
+def _download_captcha(page) -> bytes | None:
+    """下载通途验证码原始 JPG（匹配 CDP 方案：HTTP 下载 + cookies）"""
+    try:
+        captcha_url = page.evaluate(
+            'document.querySelector("img[alt=\\"验证码\\"]").src'
+        )
+        if not captcha_url:
+            return None
+        # 处理相对 URL
+        if captcha_url.startswith("/"):
+            captcha_url = f"https://passport.tongtool.com{captcha_url}"
+
+        cookies = page.context.cookies()
+        session = requests.Session()
+        for c in cookies:
+            session.cookies.set(c["name"], c["value"])
+        session.cookies.set("tongtool_front_ys", "1")
+
+        resp = session.get(
+            captcha_url,
+            headers={
+                "User-Agent": page.evaluate("navigator.userAgent"),
+                "Referer": "https://passport.tongtool.com/",
+            },
+            timeout=10,
+        )
+        if resp.status_code == 200 and len(resp.content) > 100:
+            logger.debug("下载验证码成功: %d bytes", len(resp.content))
+            return resp.content
+        logger.warning("验证码下载失败: HTTP %d, %d bytes", resp.status_code, len(resp.content))
+        return None
+    except Exception as e:
+        logger.warning("下载验证码异常: %s", e)
+        return None
+
+
 def login(page) -> bool:
-    """
-    使用 ddddocr 自动登录通途。
-    返回 True（成功）或 False（失败）。
-    """
     if not USERNAME or not PASSWORD:
         logger.error("请设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD")
         return False
 
-    ocr = DdddocrLogin(max_attempts=5)
+    ocr = DdddocrLogin()
     ocr.set_page(page)
 
     logger.info("导航到通途登录页...")
     page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=30000)
     page.wait_for_selector('input[name="username"]', state='attached', timeout=15000)
-    page.wait_for_timeout(2000)
+    page.wait_for_timeout(1500)
 
     # 勾选"7天内自动登录"
     try:
-        ocr.ensure_checkbox(SELECTORS["auto_login_cb"], "7天内自动登录")
+        cb = page.locator(SELECTORS["auto_login_cb"]).first
+        cb.wait_for(state="visible", timeout=10000)
+        if not cb.is_checked():
+            cb.check()
+            logger.info("已勾选: 7天内自动登录")
+        else:
+            logger.info("已勾选(无需操作): 7天内自动登录")
     except Exception as e:
         logger.warning("勾选自动登录失败: %s，继续...", e)
 
-    def fill():
-        ocr.fill_field(SELECTORS["username"], USERNAME)
-        ocr.fill_field(SELECTORS["password"], PASSWORD)
+    # 填入账号密码（只填一次）
+    logger.info("填入账号密码...")
+    ocr.fill_field(SELECTORS["username"], USERNAME)
+    ocr.fill_field(SELECTORS["password"], PASSWORD)
 
-    return ocr.login_loop(
-        fill_fn=fill,
-        captcha_selector=SELECTORS["captcha_img"],
-        captcha_input_selector=SELECTORS["captcha_input"],
-        login_btn_selector=SELECTORS["login_btn"],
-        url_fragment=SUCCESS_FRAGMENT,
-        exclude_fragment=EXCLUDE_FRAGMENT,
-        captcha_min_length=4,
-    )
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        logger.info("第 %d/%d 次尝试...", attempt, MAX_ATTEMPTS)
+
+        # 刷新验证码（点击图片触发 changeCaptcha()）
+        if attempt > 1:
+            try:
+                page.locator(SELECTORS["captcha_img"]).first.click()
+                page.wait_for_timeout(600)
+            except Exception as e:
+                logger.warning("刷新验证码失败: %s", e)
+
+        # 下载原始 JPG → OCR（不做预处理，匹配 CDP 方案）
+        raw_jpg = _download_captcha(page)
+        if not raw_jpg:
+            logger.warning("获取验证码失败，重试...")
+            time.sleep(0.5)
+            continue
+
+        text = ocr.solve_captcha_from_bytes(raw_jpg, use_preprocess=False, min_length=4)
+        if not text:
+            logger.warning("OCR 识别失败，重试...")
+            time.sleep(0.3)
+            continue
+
+        # 填入验证码
+        try:
+            page.locator(SELECTORS["captcha_input"]).first.fill(text)
+        except Exception as e:
+            logger.warning("填入验证码失败: %s", e)
+            time.sleep(0.3)
+            continue
+
+        # 点击登录
+        try:
+            page.locator(SELECTORS["login_btn"]).first.click()
+        except Exception as e:
+            logger.warning("点击登录失败: %s", e)
+            time.sleep(0.3)
+            continue
+
+        # 等待结果
+        page.wait_for_timeout(2000)
+        url = page.url or ""
+        if SUCCESS_FRAGMENT in url and EXCLUDE_FRAGMENT not in url:
+            logger.info("登录成功！URL: %s", url)
+            return True
+
+        logger.info("未跳转，刷新重试...")
+        time.sleep(0.3)
+
+    logger.error("全部 %d 次尝试失败", MAX_ATTEMPTS)
+    return False
 
 
 if __name__ == "__main__":

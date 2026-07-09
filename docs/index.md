@@ -22,3 +22,4 @@ timestamp: 2026-06-30
 | 通过 Gitee 贡献代码（非技术同事） | [gitee-contribution-guide.md](reference/gitee-contribution-guide.md) |
 | Gitee→GitHub 合并操作（项目主） | [gitee-to-github-merge.md](reference/gitee-to-github-merge.md) |
 | 变更记录 | [log.md](log.md) |
+| 已解决问题 | [solutions/index.md](solutions/index.md) |

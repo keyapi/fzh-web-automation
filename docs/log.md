@@ -9,6 +9,15 @@ timestamp: 2026-07-07
 
 ## 2026-07-09
 
+- **ddddocr 自动登录全修复验证**：
+  - `tongtu_login_ocr.py` 重写：HTTP 下载原始 JPG → ddddocr（匹配 CDP 方案），直连循环替代 login_loop
+  - `sellfox_login_ocr.py` 7 处修复：语法错误、SUCCESS_FRAGMENT、agree checkbox 简化、captcha 刷新、URL 轮询
+  - `ddddocr_login.py` `_checkbox_looks_checked` 增强：原生 checkbox + 祖先 label 检测
+  - 两个脚本均独立验证：通途 22s 一次成功、赛狐 15s 一次成功、无 Target crashed
+  - 新建 `docs/solutions/integration-issues/ddddocr-playwright-login-fixes.md`
+  - 更新 `docs/lessons/ddddocr-login-pitfalls.md` 验证状态 → ✅
+  - 更新 `AGENT_HANDOFF.md` 第 8 节状态
+
 - **Playwright + ddddocr 自动登录踩坑文档增强**：
   - ce-compound 增强 `docs/lessons/ddddocr-login-pitfalls.md`：新增诊断陷阱说明、GitHub issue 引用、last_updated
   - 更新 `AGENT_HANDOFF.md`：新增 ddddocr login 脚本清单 + 踩坑速查

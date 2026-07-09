@@ -223,7 +223,14 @@ class DdddocrLogin:
     # ── Element UI checkbox ──
 
     def _checkbox_looks_checked(self, locator: Locator) -> bool:
-        """Element UI checkbox 检测：看 label/__input 上的 is-checked class"""
+        """检测 checkbox 是否已勾选（Native + Element UI 兼容）"""
+        # 1) Native checkbox: locator 本身就是 <input type="checkbox">
+        try:
+            if locator.is_checked():
+                return True
+        except Exception:
+            pass
+        # 2) Element UI: is-checked class 在 locator 自身
         try:
             label = locator.first
             cls = label.get_attribute("class") or ""
@@ -231,16 +238,26 @@ class DdddocrLogin:
                 return True
         except Exception:
             pass
+        # 3) locator 包含子 <input type="checkbox">
         try:
             inp = label.locator("input[type='checkbox']")
             if inp.is_checked():
                 return True
         except Exception:
             pass
+        # 4) Element UI: is-checked 在子节点 el-checkbox__input 上
         try:
             wrap = label.locator("[class*='el-checkbox__input']")
             wcls = wrap.get_attribute("class") or ""
             if "is-checked" in wcls:
+                return True
+        except Exception:
+            pass
+        # 5) 当 selector 指向 span.el-checkbox__inner 时，is-checked 在祖父 label 上
+        try:
+            parent = label.locator("xpath=ancestor::label[contains(@class,'el-checkbox')][1]")
+            pcls = parent.get_attribute("class") or ""
+            if "is-checked" in pcls:
                 return True
         except Exception:
             pass
