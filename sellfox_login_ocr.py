@@ -61,9 +61,8 @@ def login(page) -> bool:
                 const labels = document.querySelectorAll('.el-checkbox');
                 for (const el of labels) {
                     if (el.textContent.includes('阅读并接受') && !el.classList.contains('is-checked')) {
-                        const input = el.querySelector('.el-checkbox__input');
-                        if (input) input.click();
-                        break;
+                        const inner = el.querySelector('.el-checkbox__inner');
+                        if (inner) { inner.click(); break; }
                     }
                 }
             }"""
