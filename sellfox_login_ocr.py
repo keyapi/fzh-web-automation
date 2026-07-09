@@ -81,8 +81,7 @@ def login(page) -> bool:
     else:
         logger.info("协议勾选框未显示(已有登录态)，跳过")
 
-    # 填入账号密码（只填一次）
-    logger.info("填入账号密码...")
+    # 填入账号密码（每次尝试前都重新填，因为赛狐失败会清空密码框）
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
@@ -92,6 +91,9 @@ def login(page) -> bool:
 
         # 刷新验证码
         if attempt > 1:
+            # 赛狐失败后密码框会被清空，每次重试前重新填入
+            ocr.fill_field(SELECTORS["username"], USERNAME)
+            ocr.fill_field(SELECTORS["password"], PASSWORD)
             try:
                 refresh_el = page.locator('text=点击刷新').first
                 if refresh_el.count() > 0:
