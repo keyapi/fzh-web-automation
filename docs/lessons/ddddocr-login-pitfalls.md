@@ -3,8 +3,9 @@ okf: v0.1
 type: Lesson
 title: Playwright + ddddocr 自动登录踩坑汇总
 description: 为通途和赛狐实现 Playwright + ddddocr 自动登录过程中遇到的所有问题、根因、解决方案和遗留问题
-tags: [playwright, ddddocr, login, tongtu, sellfox, ocr, captcha, element-ui]
+tags: [playwright, ddddocr, login, tongtu, sellfox, ocr, captcha, element-ui, target-crashed]
 timestamp: 2026-07-09
+last_updated: 2026-07-09
 ---
 
 # Playwright + ddddocr 自动登录 — 踩坑汇总
@@ -28,49 +29,51 @@ timestamp: 2026-07-09
 
 **解决**：
 - `page.goto(url, wait_until="domcontentloaded")` — 只等 HTML 解析完成
-- `page.goto(url, wait_until="commit")` — 最快，只等导航提交
+- `page.goto(url, wait_until="commit")` — 最快，只等导航提交（实测 0.2s）
 - 然后用 `page.wait_for_selector('#element', state='attached')` 手动等待关键 DOM 元素
 
 **代码**：
 ```python
-# ❌ 慢
-page.goto(url)  # 默认 wait_until="load"
+# ❌ 慢（默认 wait_until="load"，等所有第三方资源）
+page.goto(url)
 
-# ✅ 快
-page.goto(url, wait_until="domcontentloaded", timeout=30000)
+# ✅ 快（0.2s）
+page.goto(url, wait_until="commit", timeout=30000)
 page.wait_for_selector('#username', state='attached', timeout=15000)
 ```
 
-## 踩坑 2: Element UI checkbox 内含 `<a>` 链接导致 Target crashed
+## 踩坑 2: Element UI checkbox 内含 `<a>` 链接导致 Target crashed ★ 核心坑
 
-**现象**：赛狐"阅读并接受"协议勾选框，`label.el-checkbox` 内含两个 `<a>` 链接（"赛狐用户注册协议"和"隐私协议"）。点击 label 时如果命中 `<a>` 标签，浏览器会导航到协议页面（`target="_blank"`），导致 Chromium 渲染进程崩溃（`Page.evaluate: Target crashed`）。崩溃后所有后续 Playwright 操作挂死——`wait_for_selector` 永远等不到。
+**现象**：赛狐"阅读并接受"协议勾选框，`label.el-checkbox` 内含两个 `<a>` 链接（"赛狐用户注册协议"和"隐私协议"）。点击 label 时如果命中 `<a>` 标签，浏览器会导航到协议页面（`target="_blank"`），导致 Chromium 渲染进程崩溃（`Playwright: Target crashed`）。**崩溃后所有后续 Playwright 操作挂死——`wait_for_selector` 永远等不到，造成 `page.goto` 卡住的假象**。这是调试过程中反复 3+ 分钟等待的根因。
+
+**诊断陷阱**：崩溃前的最后一条日志是 "导航到赛狐登录页..."，因为 `page.goto` 成功返回了（0.2s），紧接着的 `page.evaluate`（点击 checkbox）触发了 crash，之后的 `wait_for_selector('#username')` 在已死的页面上永远等待——看起来像是 goto 卡了，实际上 goto 早就完成了。
 
 **DOM 结构**：
 ```html
 <label class="el-checkbox">
   <span class="el-checkbox__input">
-    <span class="el-checkbox__inner"></span>   ← 安全的点击目标
+    <span class="el-checkbox__inner"></span>   ← 安全的点击目标（纯 span，无子元素）
   </span>
   <span class="el-checkbox__label">
     阅读并接受
-    <a href="aup.html" target="_blank">赛狐用户注册协议</a>  ← 危险！
+    <a href="aup.html" target="_blank">赛狐用户注册协议</a>  ← 危险！误触会导航
     及
-    <a href="protection.html" target="_blank">隐私协议</a>       ← 危险！
+    <a href="protection.html" target="_blank">隐私协议</a>       ← 危险！误触会导航
   </span>
 </label>
 ```
 
-**解决**：选择器精确到 `span.el-checkbox__inner`（纯 span，无子元素，不会触发导航）。
+**解决**：选择器精确到 `span.el-checkbox__inner`（纯 span，无子元素，不会触发导航）。不要用 `page.evaluate()` 做 checkbox 点击——用 Playwright 原生 locator。
 
 ```python
-# ❌ 可能点到 <a> 链接 → Target crashed
+# ❌ 可能点到 <a> 链接 → Target crashed → 所有操作挂死
 "agree_cb": 'label.el-checkbox:has-text("阅读并接受")'
 
 # ✅ 精确点击 checkbox 小方块
 "agree_cb": 'label.el-checkbox:has-text("阅读并接受") span.el-checkbox__inner'
 ```
 
-**遗留问题**：使用 `ensure_checkbox()` 的 `_checkbox_looks_checked()` 检测 `is-checked` class 的 Element UI 兼容逻辑在 Python Chromium 中未充分验证。MCP 浏览器中正常。
+**遗留问题**：赛狐 Python 脚本在本地 Chromium 中 `el-checkbox__inner` 是否完全消除 crash 尚未最终验证。MCP 浏览器中正常。
 
 ## 踩坑 3: 验证码刷新后 DOM 重建导致截图失败
 
@@ -120,12 +123,20 @@ text = ocr.solve_captcha_from_bytes(png, min_length=4)
 
 **解决**：字母验证码是 JPG 格式，滑块图标是 PNG。用 `img[src^="data:image/jpg"]` 精确匹配。
 
+## 相关 GitHub Issues
+
+| Issue | 相关性 |
+|-------|--------|
+| [microsoft/playwright#2079](https://github.com/microsoft/playwright/issues/2079) | 同机制：`target="_blank"` 点击导致 WebKit 渲染器崩溃 |
+| [microsoft/playwright#12821](https://github.com/microsoft/playwright/issues/12821) | Chromium 指针事件被 label/link 拦截 |
+| [microsoft/playwright#36371](https://github.com/microsoft/playwright/issues/36371) | Element UI checkbox `locator.check` 不生效（v1.53.x 回归） |
+
 ## 验证状态
 
 | 项目 | MCP 浏览器 | Python 脚本 |
 |------|-----------|------------|
 | 通途登录 | ✅ 成功 | ⚠️ 未独立测试（逻辑与 MCP 一致） |
-| 赛狐登录 | ✅ 成功 | ❌ 未跑通（agree checkbox Target crashed 问题待最终确认） |
+| 赛狐登录 | ✅ 成功 | ⚠️ 待最终验证（agree checkbox `el-checkbox__inner` 修复后） |
 | ddddocr 识别 | ✅ 两者均可用 | ✅ `test_ocr.py` 通过 |
 | 页面加载速度 | ✅ 秒开 | ✅ `wait_until="commit"` 后 0.2s |
 
@@ -142,7 +153,6 @@ text = ocr.solve_captcha_from_bytes(png, min_length=4)
 
 ## 下一步建议
 
-1. 新对话中用 MCP 浏览器单独验证 agree checkbox 的 `el-checkbox__inner` 选择器
-2. 通途 Python 脚本独立测试（选择器简单，没有 agree checkbox 的 `<a>` 链接问题，应该直接能跑）
-3. 赛狐 agree checkbox 如果 Playwright locator 仍 crash，考虑直接用 `page.locator(...).click()` 而非 JS evaluate
-4. 清除 `chrome-profile-test/` 等测试目录的 git 跟踪
+1. 新对话中验证赛狐 agree checkbox `el-checkbox__inner` 选择器是否消除 Python Chromium 的 Target crashed
+2. 通途 Python 脚本独立测试（无 agree checkbox 问题，应直接跑通）
+3. 验证通过后合并 PR #11
