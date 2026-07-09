@@ -18,6 +18,11 @@ timestamp: 2026-07-07
   - 更新 `docs/lessons/ddddocr-login-pitfalls.md` 验证状态 → ✅
   - 更新 `AGENT_HANDOFF.md` 第 8 节状态
 
+- **Skill 自动登录规则更新**：
+  - `tongtu-automation/SKILL.md`：快速运行默认加 `--auto-login`，新增 Agent 执行规则（禁止不加 flag）
+  - `sellfox-automation/SKILL.md`：登录流程改为 `--auto-login` 自动登录，新增 Agent 执行规则
+  - 用户说"导出库存"时 Agent 自动带 `--auto-login`，有 cookie 跳过，无 cookie 时 ddddocr 识别验证码
+
 - **Playwright + ddddocr 自动登录踩坑文档增强**：
   - ce-compound 增强 `docs/lessons/ddddocr-login-pitfalls.md`：新增诊断陷阱说明、GitHub issue 引用、last_updated
   - 更新 `AGENT_HANDOFF.md`：新增 ddddocr login 脚本清单 + 踩坑速查
