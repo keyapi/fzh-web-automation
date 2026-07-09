@@ -20,6 +20,9 @@ FZH 跨境电商浏览器自动化工具集，Playwright 驱动通途 / 赛狐 E
 | `sellfox_import_update.py` | 商品导入更新（生成→上传→闭环验证） | 赛狐 |
 | `sellfox_restock_api.py` | 海外仓备货单 API E2E | 赛狐 |
 | `commodity_import_template.py` | 商品导入模板下载 | 赛狐 |
+| `ddddocr_login.py` | 共享 OCR 引擎（ddddocr + pytesseract） | 通用 |
+| `tongtu_login_ocr.py` | 通途 ddddocr 自动登录适配器 | 通途 |
+| `sellfox_login_ocr.py` | 赛狐 ddddocr 自动登录适配器 | 赛狐 |
 
 ## 3. 通途核心流程
 
@@ -112,8 +115,47 @@ FZH 跨境电商浏览器自动化工具集，Playwright 驱动通途 / 赛狐 E
 | 8 | Element UI checkbox | 必须 Playwright 真实点击 |
 | 9 | el-dialog wrapper 隐藏 | `filter(w => w.width > 0)` |
 | 10 | Excel sheet 名 | `sheet_name='商品'` |
+| 11 | `wait_until="load"` 卡 3 分钟 | 改用 `commit` 或 `domcontentloaded` |
+| 12 | Element UI checkbox `<a>` 链接 Target crashed | 选择器精确到 `.el-checkbox__inner` |
+| 13 | 验证码截图 DOM 重建 timeout | JS 读 data URI 替代 locator.screenshot() |
+| 14 | OCR < 4 位误识别 | `min_length=4` 校验 + 重试 |
 
-> 完整 13 条踩坑见 [docs/reference/tongtu-pitfalls.md](docs/reference/tongtu-pitfalls.md) 和 [docs/reference/sellfox-pitfalls.md](docs/reference/sellfox-pitfalls.md)。
+> 完整踩坑见 [docs/lessons/ddddocr-login-pitfalls.md](docs/lessons/ddddocr-login-pitfalls.md)。
+
+## 8. ddddocr 自动登录（新）
+
+```bash
+# 通途（需设环境变量）
+TONGTU_USER=xxx TONGTU_PASSWORD=xxx uv run python tongtu_auto_export.py --auto-login --fresh
+
+# 赛狐（需设环境变量）
+SELLFOX_USER=xxx SELLFOX_PASSWORD=xxx uv run python sellfox_auto_export.py --auto-login --fresh
+```
+
+### 架构
+
+```
+ddddocr_login.py       ← 共享 OCR 引擎
+  ├── tongtu_login_ocr.py   ← 通途选择器
+  └── sellfox_login_ocr.py  ← 赛狐选择器 + el-checkbox__inner
+         ↓
+  tongtu_auto_export.py  --auto-login
+  sellfox_auto_export.py --auto-login
+```
+
+### 当前状态（2026-07-09）
+
+| 平台 | MCP 浏览器 | Python 脚本 | 备注 |
+|------|-----------|------------|------|
+| 通途 | ✅ 成功 | ⚠️ 待测 | 无 agree checkbox，理论上直接通 |
+| 赛狐 | ✅ 成功 | ⚠️ 待测 | agree checkbox `el-checkbox__inner` 修复待验证 |
+
+### 关键文件
+
+- `docs/lessons/ddddocr-login-pitfalls.md` — 6 个踩坑 + GitHub issue 引用
+- `docs/reference/tongtu-captcha-ocr.md` — ddddocr CDP 方案（WX 贡献）
+- `cdp-based/` — WX 的 WorkBuddy CDP 脚本（保留）
+- PR #11 — `feature/ddddocr-playwright-login`
 
 ---
 

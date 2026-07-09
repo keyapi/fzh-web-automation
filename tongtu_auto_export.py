@@ -5,6 +5,7 @@
 用法:
   uv run python tongtu_auto_export.py           # 持久化会话，依次导出所有仓库
   uv run python tongtu_auto_export.py --fresh    # 强制重新登录
+  uv run python tongtu_auto_export.py --auto-login  # ddddocr 自动登录（首次/cookie过期）
   uv run python tongtu_auto_export.py --export-cookies  # 导出 cookies 供 MCP 使用
 
 输出目录:
@@ -225,6 +226,7 @@ def run():
         return
 
     fresh = "--fresh" in sys.argv
+    auto_login = "--auto-login" in sys.argv
 
     if fresh and PROFILE_DIR.exists():
         print("[信息] --fresh: 清除旧的登录会话...")
@@ -254,6 +256,17 @@ def run():
 
         if is_already_logged_in(page):
             print("[OK] 检测到已登录会话，自动继续...")
+        elif auto_login:
+            print("[信息] 尝试 ddddocr 自动登录...")
+            from tongtu_login_ocr import login as auto_login_fn
+            if not auto_login_fn(page):
+                print("[信息] 自动登录失败，切换到手动登录...")
+                if not wait_for_login(page):
+                    print("[错误] 登录超时，请重试")
+                    context.close()
+                    sys.exit(1)
+            else:
+                print("[OK] ddddocr 自动登录成功")
         else:
             if not first_run:
                 print("[信息] 登录会话已过期，请重新登录")
