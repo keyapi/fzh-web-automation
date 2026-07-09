@@ -77,7 +77,7 @@ if __name__ == "__main__":
 
     with sync_playwright() as p:
         context = p.chromium.launch_persistent_context(
-            user_data_dir="",
+            user_data_dir="tongtu-profile-login",
             headless=False,
             viewport={"width": 1280, "height": 800},
             args=["--disable-blink-features=AutomationControlled"],
