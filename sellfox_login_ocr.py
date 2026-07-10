@@ -10,7 +10,7 @@ import os
 import sys
 import time
 
-from ddddocr_login import DdddocrLogin
+from ddddocr_login import DdddocrLogin, _normalize_captcha_text
 
 # Windows 中文编码
 sys.stdout.reconfigure(encoding='utf-8')
@@ -38,10 +38,28 @@ SELECTORS = {
 }
 
 
+def _check_ddddocr() -> bool:
+    """Pre-flight: 检测 ddddocr + onnxruntime 是否真的可用"""
+    try:
+        import ddddocr
+        ddddocr.DdddOcr(show_ad=False)
+        return True
+    except ImportError:
+        logger.warning("ddddocr 未安装，将使用 terminal 手动输入验证码")
+        logger.warning("修复: uv add ddddocr onnxruntime")
+        return False
+    except Exception as e:
+        logger.warning("ddddocr 加载失败（可能缺少 VC++ 运行库）: %s", e)
+        logger.warning("修复: 安装 Microsoft Visual C++ Redistributable")
+        return False
+
+
 def login(page) -> bool:
     if not USERNAME or not PASSWORD:
         logger.error("请设置环境变量 SELLFOX_USER 和 SELLFOX_PASSWORD")
         return False
+
+    ocr_available = _check_ddddocr()
 
     ocr = DdddocrLogin()
     ocr.set_page(page)
@@ -81,8 +99,7 @@ def login(page) -> bool:
     else:
         logger.info("协议勾选框未显示(已有登录态)，跳过")
 
-    # 填入账号密码（只填一次）
-    logger.info("填入账号密码...")
+    # 填入账号密码（每次尝试前都重新填，因为赛狐失败会清空密码框）
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
@@ -92,6 +109,9 @@ def login(page) -> bool:
 
         # 刷新验证码
         if attempt > 1:
+            # 赛狐失败后密码框会被清空，每次重试前重新填入
+            ocr.fill_field(SELECTORS["username"], USERNAME)
+            ocr.fill_field(SELECTORS["password"], PASSWORD)
             try:
                 refresh_el = page.locator('text=点击刷新').first
                 if refresh_el.count() > 0:
@@ -113,43 +133,49 @@ def login(page) -> bool:
                     pass
 
         # 读图 → OCR（至少4位）
-        png = None
-        captcha_src = None
-        try:
-            result = page.evaluate(
-                """() => {
-                    const img = document.querySelector('img[src^="data:image/jpg"]');
-                    if (!img || !img.src) return null;
-                    const s = img.src;
-                    const i = s.indexOf(',');
-                    return { b64: i > 0 ? s.substring(i + 1) : null, src: s };
-                }"""
-            )
-            if result and result.get("b64"):
-                png = base64.b64decode(result["b64"])
-                captcha_src = result.get("src")
-        except Exception:
-            pass
+        if not ocr_available:
+            # Terminal 手动模式：跳过读图+OCR，直接提示用户输入
+            print("\n请查看浏览器中的验证码图片，在下方输入验证码后按 Enter:", file=sys.stderr)
+            text = _normalize_captcha_text(sys.stdin.readline())
+            if not text:
+                continue
+        else:
+            png = None
+            captcha_src = None
+            try:
+                result = page.evaluate(
+                    """() => {
+                        const img = document.querySelector('img[src^="data:image/jpg"]');
+                        if (!img || !img.src) return null;
+                        const s = img.src;
+                        const i = s.indexOf(',');
+                        return { b64: i > 0 ? s.substring(i + 1) : null, src: s };
+                    }"""
+                )
+                if result and result.get("b64"):
+                    png = base64.b64decode(result["b64"])
+                    captcha_src = result.get("src")
+            except Exception:
+                pass
 
-        if not png:
-            logger.warning("获取验证码失败(URL: %s)，重试...", page.url[:80])
-            if SUCCESS_FRAGMENT in (page.url or ""):
-                logger.info("登录成功！URL: %s", page.url)
-                return True
-            # 可能页面状态异常，尝试刷新回登录页
-            if "login" not in (page.url or ""):
-                page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=15000)
-                page.wait_for_timeout(1000)
-            time.sleep(0.5)
-            continue
+            if not png:
+                logger.warning("获取验证码失败(URL: %s)，重试...", page.url[:80])
+                if SUCCESS_FRAGMENT in (page.url or ""):
+                    logger.info("登录成功！URL: %s", page.url)
+                    return True
+                if "login" not in (page.url or ""):
+                    page.goto(LOGIN_URL, wait_until="domcontentloaded", timeout=15000)
+                    page.wait_for_timeout(1000)
+                time.sleep(0.5)
+                continue
 
-        last_captcha_src = captcha_src
+            last_captcha_src = captcha_src
 
-        text = ocr.solve_captcha_from_bytes(png, use_preprocess=False, min_length=4)
-        if not text:
-            logger.warning("OCR 失败，重试...")
-            time.sleep(0.3)
-            continue
+            text = ocr.solve_captcha_from_bytes(png, use_preprocess=False, min_length=4)
+            if not text:
+                logger.warning("OCR 失败，重试...")
+                time.sleep(0.3)
+                continue
 
         # 填入验证码
         try:

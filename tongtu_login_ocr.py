@@ -9,7 +9,7 @@ import sys
 import time
 
 import requests
-from ddddocr_login import DdddocrLogin
+from ddddocr_login import DdddocrLogin, _normalize_captcha_text
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -72,10 +72,28 @@ def _download_captcha(page) -> bytes | None:
         return None
 
 
+def _check_ddddocr() -> bool:
+    """Pre-flight: 检测 ddddocr + onnxruntime 是否真的可用"""
+    try:
+        import ddddocr
+        ddddocr.DdddOcr(show_ad=False)
+        return True
+    except ImportError:
+        logger.warning("ddddocr 未安装，将使用 terminal 手动输入验证码")
+        logger.warning("修复: uv add ddddocr onnxruntime")
+        return False
+    except Exception as e:
+        logger.warning("ddddocr 加载失败（可能缺少 VC++ 运行库）: %s", e)
+        logger.warning("修复: 安装 Microsoft Visual C++ Redistributable")
+        return False
+
+
 def login(page) -> bool:
     if not USERNAME or not PASSWORD:
         logger.error("请设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD")
         return False
+
+    ocr_available = _check_ddddocr()
 
     ocr = DdddocrLogin()
     ocr.set_page(page)
@@ -97,8 +115,7 @@ def login(page) -> bool:
     except Exception as e:
         logger.warning("勾选自动登录失败: %s，继续...", e)
 
-    # 填入账号密码（只填一次）
-    logger.info("填入账号密码...")
+    # 填入账号密码（每次尝试前都重新填，因为通途失败会清空密码框）
     ocr.fill_field(SELECTORS["username"], USERNAME)
     ocr.fill_field(SELECTORS["password"], PASSWORD)
 
@@ -107,6 +124,9 @@ def login(page) -> bool:
 
         # 刷新验证码（点击图片触发 changeCaptcha()）
         if attempt > 1:
+            # 通途失败后密码框会被清空，每次重试前重新填入
+            ocr.fill_field(SELECTORS["username"], USERNAME)
+            ocr.fill_field(SELECTORS["password"], PASSWORD)
             try:
                 page.locator(SELECTORS["captcha_img"]).first.click()
                 page.wait_for_timeout(600)
@@ -114,17 +134,24 @@ def login(page) -> bool:
                 logger.warning("刷新验证码失败: %s", e)
 
         # 下载原始 JPG → OCR（不做预处理，匹配 CDP 方案）
-        raw_jpg = _download_captcha(page)
-        if not raw_jpg:
-            logger.warning("获取验证码失败，重试...")
-            time.sleep(0.5)
-            continue
+        if not ocr_available:
+            # Terminal 手动模式：跳过下载+OCR，直接提示用户输入
+            print("\n请查看浏览器中的验证码图片，在下方输入验证码后按 Enter:", file=sys.stderr)
+            text = _normalize_captcha_text(sys.stdin.readline())
+            if not text:
+                continue
+        else:
+            raw_jpg = _download_captcha(page)
+            if not raw_jpg:
+                logger.warning("获取验证码失败，重试...")
+                time.sleep(0.5)
+                continue
 
-        text = ocr.solve_captcha_from_bytes(raw_jpg, use_preprocess=False, min_length=4)
-        if not text:
-            logger.warning("OCR 识别失败，重试...")
-            time.sleep(0.3)
-            continue
+            text = ocr.solve_captcha_from_bytes(raw_jpg, use_preprocess=False, min_length=4)
+            if not text:
+                logger.warning("OCR 识别失败，重试...")
+                time.sleep(0.3)
+                continue
 
         # 填入验证码
         try:

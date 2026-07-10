@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import io
 import logging
+import os
 import re
 import shutil
 import sys
@@ -147,7 +148,18 @@ class DdddocrLogin:
 
         if text:
             logger.info("验证码识别结果: %s", text)
-        return text
+            return text
+
+        # OCR 全部失败 → terminal 手动输入
+        fb = os.environ.get("OCR_FALLBACK", "stdin")
+        if fb == "fail":
+            return None
+        print(
+            "\nOCR 不可用，请在下方输入验证码字符后按 Enter（仅字母数字）:\n",
+            file=sys.stderr,
+        )
+        text = _normalize_captcha_text(sys.stdin.readline())
+        return text if text else None
 
     def solve_captcha(self, captcha_selector: str, use_preprocess: bool = True,
                        min_length: int = 0) -> Optional[str]:
