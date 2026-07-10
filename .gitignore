@@ -58,3 +58,8 @@ tongtu-profile-login/
 
 # Environment variables (contains credentials)
 .env
+
+# Codex
+.codex/
+chrome-profile-test*/
+

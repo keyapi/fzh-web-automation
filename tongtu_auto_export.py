@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 通途库存清单自动导出 + 导入文件生成（多仓库版）
 
@@ -23,7 +23,31 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 sys.stdout.reconfigure(encoding='utf-8')
+import os
 
+def load_env():
+    """加载 .env 文件中的环境变量"""
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip("\"'")
+            if key not in os.environ:
+                os.environ[key] = val
+
+load_env()
+
+# 检查登录信息
+if not os.getenv("TONGTU_USER") or not os.getenv("TONGTU_PASSWORD"):
+    print("[提示] 未检测到登录信息。")
+    print("  方式1: 在 .env 文件中添加：")
+    print("    TONGTU_USER=你的邮箱")
+    print("    TONGTU_PASSWORD=你的密码")
+    print("  方式2: 设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD")
+    print("  方式3: 不带 --auto-login 运行，浏览器打开后手动登录\n")
 TONGTU_URL = "https://erp102.tongtool.com/warehouse/goodsbalance/index.htm?warehouse=1&isFirstInto=1"
 SCRIPT_DIR = Path(__file__).parent
 PROFILE_DIR = SCRIPT_DIR / "chrome-profile"
@@ -365,3 +389,5 @@ def merge_all_inventory():
 
 if __name__ == "__main__":
     run()
+
+
