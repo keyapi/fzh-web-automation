@@ -7,6 +7,18 @@ timestamp: 2026-07-07
 
 # Changelog
 
+## 2026-07-10
+
+- **自动登录三级 fallback 架构**：
+  - `ddddocr_login.py`：补 `import os`，`solve_captcha_from_bytes` 加 stdin fallback（对齐 `solve_captcha`）
+  - `tongtu_login_ocr.py`：+ `_check_ddddocr()` pre-flight check，ddddocr 不可用时 terminal 手动输入验证码
+  - `sellfox_login_ocr.py`：同上
+  - **密码重试补填 bug**：两个 login 脚本在重试验证码时补填密码，防止登录失败后页面清空密码框
+  - 三级 fallback：OCR 可用 → 自动登录；ddddocr 缺失 → terminal 手输验证码；模块缺失 → 浏览器手动登录
+  - 全场景测试覆盖（5 场景 11 项）：正常、venv 缺失、ddddocr 缺失、onnxruntime 缺失、模块缺失
+  - 新建 `docs/lessons/login-fallback-design.md`
+  - 更新 `docs/reference/ddddocr-setup.md` 降级策略
+
 ## 2026-07-09
 
 - **ddddocr 自动登录全修复验证**：
