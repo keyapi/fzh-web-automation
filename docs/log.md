@@ -7,7 +7,15 @@ timestamp: 2026-07-07
 
 # Changelog
 
+
 ## 2026-07-10
+
+- **.env 自动加载**：
+  - `tongtu_auto_export.py` + `tongtu_login_ocr.py`：启动时自动检测并加载 `.env` 文件中的 `TONGTU_USER` / `TONGTU_PASSWORD`
+  - `tongtu_auto_export.py`：缺少登录信息时打印三种配置方式提示，不直接退出
+  - `.env.example`：新增 `TONGTU_USER` / `TONGTU_PASSWORD` 模板字段
+  - `pyproject.toml`：`onnxruntime` 锁定 1.16.3（兼容 Python 3.10），新增 `numpy<2` 约束
+
 
 - **自动登录三级 fallback 架构**：
   - `ddddocr_login.py`：补 `import os`，`solve_captcha_from_bytes` 加 stdin fallback（对齐 `solve_captcha`）
@@ -95,3 +103,4 @@ timestamp: 2026-07-07
 
 - **通途自动化 skill 创建**：从根级 SKILL_tongtu_automation.md 迁移到 .claude/skills/tongtu-automation/
 - **通途导出脚本完善**：6 仓自动导出 + 踩坑修复
+

@@ -1,10 +1,25 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 """
 通途登录 — ddddocr 自动识别验证码 + Playwright
 匹配 WX CDP 方案：HTTP 下载原始 JPG → ddddocr（不做预处理）
 """
 import logging
 import os
+from pathlib import Path
+def _load_env():
+    """加载 .env 文件中的环境变量"""
+    env_path = Path(__file__).parent / ".env"
+    if env_path.exists():
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            key, val = key.strip(), val.strip().strip("\"'")
+            if key not in os.environ:
+                os.environ[key] = val
+
+_load_env()
 import sys
 import time
 
@@ -90,7 +105,7 @@ def _check_ddddocr() -> bool:
 
 def login(page) -> bool:
     if not USERNAME or not PASSWORD:
-        logger.error("请设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD")
+        logger.error("请设置环境变量 TONGTU_USER 和 TONGTU_PASSWORD，或在 .env 文件中配置")
         return False
 
     ocr_available = _check_ddddocr()
@@ -204,3 +219,5 @@ if __name__ == "__main__":
 
         context.close()
         sys.exit(0 if success else 1)
+
+
