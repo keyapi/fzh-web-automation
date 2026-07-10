@@ -102,6 +102,14 @@ uv run python test_ocr.py captcha.png
 
 ## 降级策略
 
+自动登录采用**三级 fallback** 架构，确保任何依赖状态都有可操作的路径：
+
+| 层级 | 条件 | 行为 |
+|------|------|------|
+| Level 1 | ddddocr 可用 | 自动 OCR 识别验证码 |
+| Level 2 | ddddocr 不可用（未安装/VC++ 缺失） | terminal 提示用户手动输入验证码（浏览器中可见验证码图片） |
+| Level 3 | ddddocr_login.py 整个模块缺失 | 打开浏览器，用户手动填表登录 |
+
 如果自动登录一直失败（OCR 识别率低或持续报错），可临时关闭自动登录：
 
 ```bash
@@ -109,7 +117,19 @@ uv run python test_ocr.py captcha.png
 uv run python tongtu_auto_export.py
 ```
 
-主脚本在 ddddocr 不可用时自动降级为人工登录，不会崩溃。
+主脚本在 ddddocr 不可用时自动降级，不会崩溃。降级时会打印明确的修复提示：
+
+```
+# ddddocr 未安装
+ddddocr 未安装，将使用 terminal 手动输入验证码
+修复: uv add ddddocr onnxruntime
+
+# onnxruntime / VC++ 缺失
+ddddocr 加载失败（可能缺少 VC++ 运行库）: DLL load failed
+修复: 安装 Microsoft Visual C++ Redistributable
+```
+
+> 详见 [login-fallback-design.md](../lessons/login-fallback-design.md) — 完整架构设计文档。
 
 ## 相关文档
 

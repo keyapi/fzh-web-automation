@@ -12,3 +12,4 @@ timestamp: 2026-06-30
 |------|------|
 | [webfetch-fix.md](webfetch-fix.md) | WebFetch 失败修复（skipWebFetchPreflight） |
 | [ddddocr-login-pitfalls.md](ddddocr-login-pitfalls.md) | Playwright + ddddocr 自动登录踩坑汇总（6 个坑 + 解决方案） |
+| [login-fallback-design.md](login-fallback-design.md) | 自动登录三级 fallback 架构：pre-flight check + terminal 手动 + 浏览器兜底 |
